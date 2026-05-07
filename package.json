@@ -1,0 +1,60 @@
+{
+  "name": "allmone",
+  "version": "0.1.2",
+  "description": "Electron desktop control plane for CLIProxyAPI-managed model resources.",
+  "main": "./out/main/index.js",
+  "author": "aiirobyte",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "test": "bun test",
+    "build": "bun run typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "bun run typecheck:node && bun run typecheck:web",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "dist": "bun run build && electron-builder",
+    "dist:mac": "bun run build && electron-builder --mac",
+    "dist:win": "bun run build && electron-builder --win",
+    "dist:linux": "bun run build && electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.allmone.app",
+    "productName": "Allmone",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "linux": {
+      "category": "Utility",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.11",
+    "electron": "^42.0.0",
+    "electron-builder": "^26.8.1",
+    "electron-vite": "^5.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.10"
+  }
+}

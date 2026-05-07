@@ -1,0 +1,257 @@
+import assert from 'node:assert/strict'
+
+import { CliProxyApiError, type CliProxyApiConfigResult } from '../cliproxyapi'
+import {
+  createRuntimeService,
+  type RuntimeCliProxyApiClient,
+  type RuntimeClientFactory
+} from './service'
+import type { RuntimeLoadedSettings } from './types'
+import type { RuntimeSettingsStore } from './settingsStore'
+
+function loadedSettings(
+  overrides: Partial<RuntimeLoadedSettings> = {}
+): RuntimeLoadedSettings {
+  return {
+    connection: {
+      baseUrl: 'http://localhost:8317/v0/management',
+      timeoutMs: 5000,
+      managementKeyConfigured: true,
+      managementKeyPersisted: true
+    },
+    managementKey: 'mgmt-secret',
+    ...overrides
+  }
+}
+
+function createFakeStore(initial: RuntimeLoadedSettings): RuntimeSettingsStore & {
+  nextSaved?: RuntimeLoadedSettings
+} {
+  return {
+    nextSaved: undefined,
+    async load() {
+      return initial
+    },
+    async saveConnectionSettings() {
+      return this.nextSaved ?? initial
+    }
+  }
+}
+
+function createFakeClient(
+  overrides: Partial<RuntimeCliProxyApiClient> = {}
+): RuntimeCliProxyApiClient {
+  return {
+    async checkManagementApi() {
+      return { ok: true, state: 'reachable', status: 200 }
+    },
+    async getConfig() {
+      return { config: {}, raw: {} }
+    },
+    async upsertOpenAiCompatibilityProvider() {
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async deleteOpenAiCompatibilityProvider() {
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    ...overrides
+  }
+}
+
+test('maps runtime connection checks into sanitized service state', async () => {
+  const store = createFakeStore(loadedSettings())
+  const client = createFakeClient({
+    async checkManagementApi() {
+      return {
+        ok: false,
+        state: 'auth_required',
+        status: 401,
+        error: 'Authorization: Bearer mgmt-secret'
+      }
+    }
+  })
+  const service = createRuntimeService({
+    settingsStore: store,
+    createClient: () => client
+  })
+
+  await service.initialize()
+  const result = await service.testConnection()
+  const state = service.getState()
+
+  assert.equal(result.state, 'auth_required')
+  assert.equal(state.status, 'auth_required')
+  assert.equal(state.lastError, 'Authorization: Bearer [REDACTED]')
+  assert(!JSON.stringify(state).includes('mgmt-secret'))
+})
+
+test('rebuilds the CLIProxyAPI client after saving connection settings', async () => {
+  const store = createFakeStore(loadedSettings())
+  store.nextSaved = loadedSettings({
+    connection: {
+      baseUrl: 'http://localhost:9000/v0/management',
+      timeoutMs: 2500,
+      managementKeyConfigured: true,
+      managementKeyPersisted: false
+    },
+    managementKey: 'new-management-key'
+  })
+  const seenOptions: Array<{
+    baseUrl?: string
+    managementKey?: string
+    timeoutMs?: number
+  }> = []
+  const createClient: RuntimeClientFactory = (options) => {
+    seenOptions.push(options)
+    return createFakeClient()
+  }
+  const service = createRuntimeService({ settingsStore: store, createClient })
+
+  await service.initialize()
+  await service.saveConnectionSettings({
+    baseUrl: 'http://localhost:9000/v0/management',
+    managementKey: 'new-management-key',
+    timeoutMs: 2500
+  })
+
+  assert.deepEqual(seenOptions.at(-1), {
+    baseUrl: 'http://localhost:9000/v0/management',
+    managementKey: 'new-management-key',
+    timeoutMs: 2500
+  })
+})
+
+test('returns sanitized config summaries without provider secrets', async () => {
+  const store = createFakeStore(loadedSettings())
+  const config: CliProxyApiConfigResult = {
+    config: {
+      debug: true,
+      'api-keys': ['client-a', 'client-b'],
+      'request-log': true,
+      'request-retry': 3,
+      'openai-compatibility': [
+        {
+          name: 'openrouter',
+          disabled: false,
+          'base-url': 'https://openrouter.ai/api/v1',
+          'api-key-entries': [
+            {
+              'api-key': 'sk-live-abcdefghijklmnopqrstuvwxyz',
+              'proxy-url': 'socks5://user:pass@proxy.example.com:1080',
+              'auth-index': 'auth-1'
+            }
+          ],
+          models: [{ name: 'moonshotai/kimi-k2:free', alias: 'kimi-k2' }],
+          headers: { 'X-Team': 'core' }
+        }
+      ]
+    },
+    raw: {}
+  }
+  const service = createRuntimeService({
+    settingsStore: store,
+    createClient: () =>
+      createFakeClient({
+        async getConfig() {
+          return config
+        }
+      })
+  })
+
+  await service.initialize()
+  const summary = await service.getConfigSummary()
+  const serialized = JSON.stringify(summary)
+
+  assert.equal(summary.apiKeysConfigured, 2)
+  assert.equal(summary.openAiCompatibilityProviders[0]?.name, 'openrouter')
+  assert.equal(
+    summary.openAiCompatibilityProviders[0]?.apiKeyEntries[0]?.proxyUrl,
+    'socks5://[REDACTED]@proxy.example.com:1080'
+  )
+  assert(!serialized.includes('sk-live-abcdefghijklmnopqrstuvwxyz'))
+  assert(!serialized.includes('user:pass'))
+})
+
+test('upserts and deletes providers through CLIProxyAPI and refreshes summaries', async () => {
+  const store = createFakeStore(loadedSettings())
+  const upserts: unknown[] = []
+  const deletes: unknown[] = []
+  const service = createRuntimeService({
+    settingsStore: store,
+    createClient: () =>
+      createFakeClient({
+        async getConfig() {
+          return {
+            config: {
+              'openai-compatibility': [
+                {
+                  name: 'openrouter',
+                  'base-url': 'https://openrouter.ai/api/v1'
+                }
+              ]
+            },
+            raw: {}
+          }
+        },
+        async upsertOpenAiCompatibilityProvider(input) {
+          upserts.push(input)
+          return { ok: true, status: 200, raw: { status: 'ok' } }
+        },
+        async deleteOpenAiCompatibilityProvider(input) {
+          deletes.push(input)
+          return { ok: true, status: 200, raw: { status: 'ok' } }
+        }
+      })
+  })
+
+  await service.initialize()
+  const upserted = await service.upsertOpenAiCompatibilityProvider({
+    name: 'openrouter',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiKey: 'provider-secret',
+    proxyUrl: '',
+    models: [{ name: 'moonshotai/kimi-k2:free', alias: 'kimi-k2' }]
+  })
+  const deleted = await service.deleteOpenAiCompatibilityProvider({
+    name: 'openrouter'
+  })
+
+  assert.deepEqual(upserts[0], {
+    name: 'openrouter',
+    disabled: false,
+    'base-url': 'https://openrouter.ai/api/v1',
+    'api-key-entries': [{ 'api-key': 'provider-secret', 'proxy-url': '' }],
+    models: [{ name: 'moonshotai/kimi-k2:free', alias: 'kimi-k2' }]
+  })
+  assert.deepEqual(deletes[0], { name: 'openrouter' })
+  assert.equal(upserted.summary.openAiCompatibilityProviders[0]?.name, 'openrouter')
+  assert.equal(deleted.status, 200)
+})
+
+test('throws sanitized errors for runtime operation failures', async () => {
+  const store = createFakeStore(loadedSettings())
+  const service = createRuntimeService({
+    settingsStore: store,
+    createClient: () =>
+      createFakeClient({
+        async getConfig() {
+          throw new CliProxyApiError({
+            kind: 'unexpected_http',
+            state: 'unexpected_error',
+            message: 'provider-secret Authorization: Bearer mgmt-secret'
+          })
+        }
+      })
+  })
+
+  await service.initialize()
+
+  await assert.rejects(
+    () => service.getConfigSummary(),
+    (error) =>
+      error instanceof Error &&
+      error.message.includes('[REDACTED]') &&
+      !error.message.includes('provider-secret') &&
+      !error.message.includes('mgmt-secret')
+  )
+})
