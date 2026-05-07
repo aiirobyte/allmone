@@ -19,7 +19,7 @@ Preserve user changes and keep secrets out of renderer storage.
 
 Current next prompt:
 
-- Start v0.1.4 Prompt 0: Runtime Home And Software Config.
+- Start v0.1.4 Prompt 1: Official CLIProxyAPI Installer And Updater.
 
 ## Operating Rule
 

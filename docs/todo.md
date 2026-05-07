@@ -32,14 +32,17 @@ Definition of done:
 - [x] Create `docs/version/0.1.4/spec.md`.
 - [x] Create `docs/version/0.1.4/prompt_plan.md`.
 - [x] Create `docs/version/0.1.4/todo.md`.
+- [x] Create and use `~/.allmone` for managed runtime files.
+- [x] Store non-secret software configuration in `~/.allmone/config.yaml`.
+- [x] Store CLIProxyAPI download address and local executable path in software configuration.
 
 ## Next Prompt
 
-Start v0.1.4 Prompt 0 from `docs/version/0.1.4/prompt_plan.md`.
+Start v0.1.4 Prompt 1 from `docs/version/0.1.4/prompt_plan.md`.
 
 Expected next change:
 
-- Implement runtime home resolution and YAML software config under `~/.allmone`.
+- Implement the official CLIProxyAPI installer and updater.
 
 ## Version Roadmap
 

@@ -1,7 +1,9 @@
 import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron'
 import { join } from 'node:path'
 
+import { createAllmoneConfigStore } from './runtime/allmoneConfigStore'
 import { registerRuntimeIpcHandlers } from './runtime/ipc'
+import { resolveRuntimeHome } from './runtime/runtimeHome'
 import { createRuntimeService } from './runtime/service'
 import { createRuntimeSettingsStore } from './runtime/settingsStore'
 
@@ -41,9 +43,15 @@ function createMainWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  const runtimeHome = resolveRuntimeHome()
+  const allmoneConfigStore = createAllmoneConfigStore({
+    runtimeHome,
+    legacySettingsFilePath: join(app.getPath('userData'), 'runtime-settings.json')
+  })
   const settingsStore = createRuntimeSettingsStore({ app, safeStorage })
   const runtimeService = createRuntimeService({ settingsStore })
 
+  await allmoneConfigStore.load()
   await runtimeService.initialize()
 
   ipcMain.handle('app:get-version', () => app.getVersion())

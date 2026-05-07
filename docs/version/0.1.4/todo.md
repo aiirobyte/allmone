@@ -12,9 +12,9 @@ Definition of done:
 - [x] Create `docs/version/0.1.4/spec.md`.
 - [x] Create `docs/version/0.1.4/prompt_plan.md`.
 - [x] Create `docs/version/0.1.4/todo.md`.
-- [ ] Create and use `~/.allmone` for managed runtime files.
-- [ ] Store non-secret software configuration in `~/.allmone/config.yaml`.
-- [ ] Store CLIProxyAPI download address and local executable path in software configuration.
+- [x] Create and use `~/.allmone` for managed runtime files.
+- [x] Store non-secret software configuration in `~/.allmone/config.yaml`.
+- [x] Store CLIProxyAPI download address and local executable path in software configuration.
 - [ ] Store install metadata at `~/.allmone/runtime/install.json`.
 - [ ] Download missing CLIProxyAPI executable from official releases.
 - [ ] Check official release metadata and safely update stale managed executables.
@@ -33,11 +33,11 @@ Definition of done:
 
 ## Next Prompt
 
-Start v0.1.4 Prompt 0 from `docs/version/0.1.4/prompt_plan.md`.
+Start v0.1.4 Prompt 1 from `docs/version/0.1.4/prompt_plan.md`.
 
 Expected next change:
 
-- Implement runtime home resolution and YAML software config under `~/.allmone`.
+- Implement the official CLIProxyAPI installer and updater.
 
 ## Guardrails
 
@@ -65,3 +65,8 @@ Expected next change:
 - API output port is allmone-owned and should update CLIProxyAPI config plus derived safe URLs.
 - Existing managed executable should launch even when update checks fail.
 - Port changes should restart the managed process after writing config.
+
+## Implementation Notes
+
+- Prompt 0 completed on 2026-05-07: added runtime home resolution, directory creation, YAML software config defaults/validation, and old userData settings fallback.
+- Prompt 0 verification passed: `bun run test`, `bun run typecheck`.
