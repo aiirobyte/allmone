@@ -31,8 +31,8 @@ Add a main-process runtime home module that resolves ~/.allmone from the user ho
 Add an AllmoneConfigStore that creates, reads, validates, and writes ~/.allmone/config.yaml with a structured YAML parser.
 Store non-secret settings in config.yaml: CLIProxyAPI release metadata URL, release page URL, local executable path, runtime host, runtime output port, runtime config path, and derived safe API URLs.
 Keep Management API credentials and other secrets out of config.yaml and continue using Electron safeStorage or main-process memory for secrets.
-Keep a best-effort read fallback for the old Electron userData settings file without deleting it.
-Add tests for path resolution, directory creation, default YAML creation, default port, invalid stored port normalization, invalid localExecutablePath rejection, invalid releaseMetadataUrl rejection, and old-settings fallback.
+Delete the old Electron userData runtime settings file during startup without migrating old values.
+Add tests for path resolution, directory creation, default YAML creation, default port, invalid stored port normalization, invalid localExecutablePath rejection, invalid releaseMetadataUrl rejection, and old-settings deletion.
 Run bun run test and bun run typecheck.
 Update docs/version/0.1.4/todo.md.
 ```

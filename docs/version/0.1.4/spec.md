@@ -72,7 +72,7 @@ Rules:
 - Keep downloads temporary until checksum verification and extraction succeed.
 - Store install metadata separately from secrets.
 - Continue using Electron `safeStorage` for generated management credentials where encryption is available.
-- If old v0.1.2/v0.1.3 settings exist under Electron `userData`, a one-time best-effort read fallback may preserve the user's base settings, but old files must not be deleted in this version.
+- If old v0.1.2/v0.1.3 settings exist under Electron `userData`, delete the old runtime settings file without migrating values.
 
 ## Software Config
 
