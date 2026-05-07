@@ -17,3 +17,4 @@ Status: Complete
 Next version: `0.1.1`.
 
 Next focus: define the CLIProxyAPI management API contract and thin client boundary without adding GUI, tray, or provider proxying logic.
+

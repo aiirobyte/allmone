@@ -44,3 +44,4 @@ allmone is an Electron desktop control plane for a user's AI model resources. Th
 ## Result
 
 v0.1.0 is complete. The planning baseline now exists and has been migrated into the versioned planning structure introduced for v0.1.1.
+
