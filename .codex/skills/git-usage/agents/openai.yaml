@@ -1,4 +1,0 @@
-interface:
-  display_name: "Git Usage"
-  short_description: "Worktree and commit discipline for git"
-  default_prompt: "Use $git-usage to plan git worktree development and make disciplined commits."

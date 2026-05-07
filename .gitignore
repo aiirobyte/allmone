@@ -62,3 +62,6 @@ Desktop.ini
 tmp/
 temp/
 .cache/
+
+# Local Codex skills and state
+.codex/
