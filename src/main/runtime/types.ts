@@ -26,6 +26,8 @@ export interface RuntimeState {
   status: CliProxyApiManagementState
   connection: RuntimeConnectionSettings
   lastError?: string
+  lastCheckedAt?: string
+  lastHttpStatus?: number
 }
 
 export interface RuntimeOpenAiProviderSummary {

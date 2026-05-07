@@ -82,7 +82,59 @@ test('maps runtime connection checks into sanitized service state', async () => 
   assert.equal(result.state, 'auth_required')
   assert.equal(state.status, 'auth_required')
   assert.equal(state.lastError, 'Authorization: Bearer [REDACTED]')
+  assert.equal(state.lastHttpStatus, 401)
+  assert.equal(typeof state.lastCheckedAt, 'string')
+  assert(!Number.isNaN(Date.parse(state.lastCheckedAt ?? '')))
   assert(!JSON.stringify(state).includes('mgmt-secret'))
+})
+
+test('records diagnostic metadata for management check states', async () => {
+  const cases = [
+    { state: 'reachable', status: 200, error: undefined },
+    { state: 'management_disabled', status: 404, error: 'Not found' },
+    { state: 'timeout', status: undefined, error: 'Timed out after 5000ms' },
+    {
+      state: 'invalid_response',
+      status: 200,
+      error: 'Invalid JSON containing sk-live-abcdefghijklmnopqrstuvwxyz'
+    },
+    {
+      state: 'unexpected_error',
+      status: 500,
+      error: 'provider-secret Authorization: Bearer mgmt-secret'
+    }
+  ] as const
+
+  for (const item of cases) {
+    const store = createFakeStore(loadedSettings())
+    const service = createRuntimeService({
+      settingsStore: store,
+      createClient: () =>
+        createFakeClient({
+          async checkManagementApi() {
+            return {
+              ok: item.state === 'reachable',
+              state: item.state,
+              status: item.status,
+              error: item.error
+            }
+          }
+        })
+    })
+
+    await service.initialize()
+    const result = await service.testConnection()
+    const state = service.getState()
+    const serialized = JSON.stringify({ result, state })
+
+    assert.equal(state.status, item.state)
+    assert.equal(state.lastHttpStatus, item.status)
+    assert.equal(typeof state.lastCheckedAt, 'string')
+    assert(!Number.isNaN(Date.parse(state.lastCheckedAt ?? '')))
+    assert(!serialized.includes('sk-live-abcdefghijklmnopqrstuvwxyz'))
+    assert(!serialized.includes('provider-secret'))
+    assert(!serialized.includes('mgmt-secret'))
+  }
 })
 
 test('rebuilds the CLIProxyAPI client after saving connection settings', async () => {

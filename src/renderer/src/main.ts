@@ -22,14 +22,23 @@ type ModelDraft = {
 type ProviderDraft = {
   name: string
   baseUrl: string
+  proxyUrl: string
   disabled: boolean
   models: ModelDraft[]
 }
+
+type ConfigLoadResult = {
+  summary: RuntimeConfigSummary | null
+  error: string | null
+}
+
+type SafeEndpointKind = 'management' | 'origin'
 
 type ViewState = {
   appVersion: string
   runtimeState: RuntimeState | null
   configSummary: RuntimeConfigSummary | null
+  configLoadError: string | null
   providerDraft: ProviderDraft
   selectedProviderName: string | null
   busyAction: string | null
@@ -40,6 +49,7 @@ type ViewState = {
 const emptyProviderDraft = (): ProviderDraft => ({
   name: '',
   baseUrl: '',
+  proxyUrl: '',
   disabled: false,
   models: [{ name: '', alias: '' }]
 })
@@ -48,6 +58,7 @@ const state: ViewState = {
   appVersion: '',
   runtimeState: null,
   configSummary: null,
+  configLoadError: null,
   providerDraft: emptyProviderDraft(),
   selectedProviderName: null,
   busyAction: 'Loading',
@@ -61,15 +72,16 @@ async function bootstrap(): Promise<void> {
   render()
 
   try {
-    const [appVersion, runtimeState, configSummary] = await Promise.all([
+    const [appVersion, runtimeState] = await Promise.all([
       window.allmone.app.getVersion(),
-      window.allmone.runtime.getState(),
-      loadConfigSummary()
+      window.allmone.runtime.getState()
     ])
+    const config = await loadConfigSummary()
 
     state.appVersion = appVersion
     state.runtimeState = runtimeState
-    state.configSummary = configSummary
+    state.configSummary = config.summary
+    state.configLoadError = config.error
     state.error = null
   } catch (error) {
     state.error = toMessage(error)
@@ -79,11 +91,17 @@ async function bootstrap(): Promise<void> {
   }
 }
 
-async function loadConfigSummary(): Promise<RuntimeConfigSummary | null> {
+async function loadConfigSummary(): Promise<ConfigLoadResult> {
   try {
-    return await window.allmone.runtime.getConfigSummary()
-  } catch {
-    return null
+    return {
+      summary: await window.allmone.runtime.getConfigSummary(),
+      error: null
+    }
+  } catch (error) {
+    return {
+      summary: null,
+      error: toMessage(error)
+    }
   }
 }
 
@@ -92,7 +110,7 @@ function render(): void {
     <section class="workspace">
       <header class="topbar">
         <div>
-          <p class="eyebrow">allmone ${escapeHtml(state.appVersion || '0.1.2')}</p>
+          <p class="eyebrow">allmone ${escapeHtml(state.appVersion || '0.1.3')}</p>
           <h1>Runtime Control</h1>
         </div>
         <div class="status-pill ${statusClass(state.runtimeState?.status)}">
@@ -195,17 +213,33 @@ function renderConnectionForm(): string {
 }
 
 function renderStatusPanel(): string {
-  const connection = state.runtimeState?.connection
+  const runtime = state.runtimeState
+  const connection = runtime?.connection
+  const managementUrl = getSafeEndpoint('management')
+  const serviceOrigin = getSafeEndpoint('origin')
 
   return `
+    <div class="state-action ${statusClass(runtime?.status)}">
+      <strong>${escapeHtml(statusLabel(runtime?.status))}</strong>
+      <span>${escapeHtml(nextActionForStatus(runtime?.status))}</span>
+    </div>
+    ${renderFirstLaunchHint()}
     <dl class="status-grid">
       <div>
         <dt>Status</dt>
-        <dd>${escapeHtml(statusLabel(state.runtimeState?.status))}</dd>
+        <dd>${escapeHtml(statusLabel(runtime?.status))}</dd>
       </div>
       <div>
         <dt>Key Storage</dt>
         <dd>${escapeHtml(connectionKeyLabel())}</dd>
+      </div>
+      <div>
+        <dt>HTTP Status</dt>
+        <dd>${runtime?.lastHttpStatus ?? 'None'}</dd>
+      </div>
+      <div>
+        <dt>Last Test</dt>
+        <dd>${escapeHtml(formatCheckedAt(runtime?.lastCheckedAt))}</dd>
       </div>
       <div>
         <dt>Client API Keys</dt>
@@ -216,17 +250,89 @@ function renderStatusPanel(): string {
         <dd>${state.configSummary?.requestLog === true ? 'Enabled' : 'Off'}</dd>
       </div>
     </dl>
+    ${runtime?.lastError ? renderDiagnostic(runtime.lastError) : ''}
+    <div class="copy-panel">
+      ${renderCopyRow('Management URL', managementUrl, 'management')}
+      ${renderCopyRow('Service Origin', serviceOrigin, 'origin')}
+    </div>
+    ${connection && !managementUrl ? '<p class="inline-warning">Management URL is not a valid URL.</p>' : ''}
+  `
+}
+
+function renderFirstLaunchHint(): string {
+  const connection = state.runtimeState?.connection
+
+  if (connection?.managementKeyConfigured) {
+    return ''
+  }
+
+  return `
+    <div class="empty-callout">
+      <strong>No management key saved</strong>
+      <span>Enter the CLIProxyAPI management key, save, then test.</span>
+    </div>
+  `
+}
+
+function renderDiagnostic(message: string): string {
+  return `
+    <div class="diagnostic">
+      <span>Diagnostic</span>
+      <code>${escapeHtml(message)}</code>
+    </div>
+  `
+}
+
+function renderCopyRow(
+  label: string,
+  value: string | null,
+  kind: SafeEndpointKind
+): string {
+  return `
+    <div class="copy-row">
+      <div>
+        <span>${escapeHtml(label)}</span>
+        <code>${escapeHtml(value ?? 'Unavailable')}</code>
+      </div>
+      <button
+        type="button"
+        data-action="copy-endpoint"
+        data-copy-kind="${kind}"
+        ${value ? isBusy(`copy:${kind}`) : 'disabled'}
+      >
+        Copy
+      </button>
+    </div>
   `
 }
 
 function renderProviderList(): string {
   const providers = state.configSummary?.openAiCompatibilityProviders ?? []
 
+  if (state.configLoadError) {
+    return `
+      <div class="empty-list">
+        <strong>Config unavailable</strong>
+        <span>Make the runtime reachable, then refresh.</span>
+        <code>${escapeHtml(state.configLoadError)}</code>
+      </div>
+    `
+  }
+
+  if (!isRuntimeReachable() && !state.configSummary) {
+    return `
+      <div class="empty-list">
+        <strong>Connect runtime</strong>
+        <span>Save settings and test the Management API before editing providers.</span>
+      </div>
+    `
+  }
+
   if (providers.length === 0) {
     return `
       <div class="empty-list">
         <strong>No providers</strong>
-        <span>Add an OpenAI-compatible provider to expose static model aliases.</span>
+        <span>Add an OpenAI-compatible provider after the runtime is reachable.</span>
       </div>
     `
   }
@@ -242,13 +348,16 @@ function renderProviderItem(provider: RuntimeOpenAiProviderSummary): string {
   const active = provider.name === state.selectedProviderName
   const models = provider.models.length
   const keys = provider.apiKeyEntries.length
+  const deleteDisabled = !isRuntimeReachable()
+    ? 'disabled'
+    : isBusy(`delete-provider:${provider.name}`)
 
   return `
     <article class="provider-row ${active ? 'selected' : ''}">
       <div>
         <h3>${escapeHtml(provider.name || 'Unnamed provider')}</h3>
         <p>${escapeHtml(provider.baseUrl || 'No base URL')}</p>
-        <span>${models} models · ${keys} keys · ${provider.disabled ? 'disabled' : 'enabled'}</span>
+        <span>${models} models / ${keys} keys / ${provider.disabled ? 'disabled' : 'enabled'}</span>
       </div>
       <div class="row-actions">
         <button type="button" data-action="edit-provider" data-provider="${escapeHtml(provider.name)}">
@@ -259,7 +368,7 @@ function renderProviderItem(provider: RuntimeOpenAiProviderSummary): string {
           class="danger"
           data-action="delete-provider"
           data-provider="${escapeHtml(provider.name)}"
-          ${isBusy(`delete-provider:${provider.name}`)}
+          ${deleteDisabled}
         >
           Delete
         </button>
@@ -270,36 +379,53 @@ function renderProviderItem(provider: RuntimeOpenAiProviderSummary): string {
 
 function renderProviderForm(): string {
   const draft = state.providerDraft
+  const editing = Boolean(state.selectedProviderName)
+  const providerWriteDisabled = !isRuntimeReachable()
+  const submitDisabled = providerWriteDisabled
+    ? 'disabled'
+    : isBusy('save-provider')
+  const nameReadonly = editing ? 'readonly' : ''
+  const keyLabel = editing ? 'Replacement API Key' : 'Provider API Key'
+  const proxyLabel = editing ? 'Proxy URL For Replacement' : 'Proxy URL'
 
   return `
     <form id="provider-form" class="provider-form">
+      <div class="form-mode">
+        <strong>${editing ? 'Editing provider' : 'New provider'}</strong>
+        <span>${editing ? escapeHtml(state.selectedProviderName ?? '') : 'Ready for a new provider'}</span>
+      </div>
       <div class="form-grid">
         <label>
-          <span>Provider Name</span>
-          <input name="name" value="${escapeHtml(draft.name)}" required />
+          <span>${editing ? 'Provider Name (locked)' : 'Provider Name'}</span>
+          <input name="name" value="${escapeHtml(draft.name)}" ${nameReadonly} required />
         </label>
         <label>
           <span>Base URL</span>
           <input name="baseUrl" type="url" value="${escapeHtml(draft.baseUrl)}" required />
         </label>
         <label>
-          <span>Provider API Key</span>
+          <span>${keyLabel}</span>
           <input
             name="apiKey"
             type="password"
             autocomplete="off"
-            placeholder="Required for add/update"
+            placeholder="${editing ? 'Type only to replace hidden saved keys' : 'Required when the provider needs a key'}"
           />
         </label>
         <label>
-          <span>Proxy URL</span>
-          <input name="proxyUrl" spellcheck="false" placeholder="Optional" />
+          <span>${proxyLabel}</span>
+          <input name="proxyUrl" spellcheck="false" value="${escapeHtml(draft.proxyUrl)}" placeholder="Optional" />
         </label>
         <label class="checkbox-row">
           <input name="disabled" type="checkbox" ${draft.disabled ? 'checked' : ''} />
           <span>Disabled</span>
         </label>
       </div>
+
+      <p class="form-note">
+        ${editing ? 'Saved provider keys are hidden. A blank replacement key sends no key value.' : 'Provider secrets stay in the main process and are not stored in the renderer.'}
+      </p>
+      ${providerWriteDisabled ? '<p class="inline-warning">Provider writes are disabled until the runtime is reachable.</p>' : ''}
 
       <div class="models-header">
         <h3>Static Models</h3>
@@ -310,7 +436,7 @@ function renderProviderForm(): string {
       </div>
 
       <div class="button-row">
-        <button type="submit" ${isBusy('save-provider')}>Save Provider</button>
+        <button type="submit" ${submitDisabled}>${editing ? 'Save Edits' : 'Add Provider'}</button>
         <button type="button" data-action="reset-provider">Reset</button>
       </div>
     </form>
@@ -336,7 +462,7 @@ function renderModelRow(model: ModelDraft, index: number): string {
         data-action="remove-model-row"
         data-index="${index}"
       >
-        ×
+        x
       </button>
     </div>
   `
@@ -372,6 +498,10 @@ async function onConnectionSubmit(event: SubmitEvent): Promise<void> {
       managementKey: managementKey || undefined,
       clearManagementKey: data.get('clearManagementKey') === 'on'
     })
+    state.configSummary = null
+    state.configLoadError = null
+    state.providerDraft = emptyProviderDraft()
+    state.selectedProviderName = null
     state.notice = 'Connection settings saved'
   })
 }
@@ -381,6 +511,12 @@ async function onProviderSubmit(event: SubmitEvent): Promise<void> {
   const form = event.currentTarget
 
   if (!(form instanceof HTMLFormElement)) {
+    return
+  }
+
+  if (!isRuntimeReachable()) {
+    state.error = 'Connect to CLIProxyAPI before saving providers'
+    render()
     return
   }
 
@@ -399,6 +535,7 @@ async function onProviderSubmit(event: SubmitEvent): Promise<void> {
       })
 
     state.configSummary = result.summary
+    state.configLoadError = null
     state.providerDraft = emptyProviderDraft()
     state.selectedProviderName = null
     state.notice = 'Provider saved'
@@ -416,14 +553,13 @@ function onActionClick(event: Event): void {
 
   switch (action) {
     case 'test-connection':
-      void runAction('test-connection', async () => {
-        const result = await window.allmone.runtime.testConnection()
-        state.runtimeState = await window.allmone.runtime.getState()
-        state.notice = `Connection ${statusLabel(result.state).toLowerCase()}`
-      })
+      void testConnection()
       break
     case 'refresh-config':
       void refreshConfig()
+      break
+    case 'copy-endpoint':
+      void copyEndpoint(target.dataset.copyKind)
       break
     case 'edit-provider':
       editProvider(target.dataset.provider ?? '')
@@ -452,11 +588,63 @@ function onActionClick(event: Event): void {
   }
 }
 
+async function testConnection(): Promise<void> {
+  await runAction('test-connection', async () => {
+    const result = await window.allmone.runtime.testConnection()
+
+    state.runtimeState = await window.allmone.runtime.getState()
+    if (result.state !== 'reachable') {
+      state.configSummary = null
+      state.configLoadError = null
+      state.providerDraft = emptyProviderDraft()
+      state.selectedProviderName = null
+    }
+    state.notice = `Connection ${statusLabel(result.state).toLowerCase()}`
+  })
+}
+
 async function refreshConfig(): Promise<void> {
   await runAction('refresh-config', async () => {
+    const check = await window.allmone.runtime.testConnection()
+
     state.runtimeState = await window.allmone.runtime.getState()
-    state.configSummary = await window.allmone.runtime.getConfigSummary()
+    state.configSummary = null
+    state.configLoadError = null
+
+    if (check.state !== 'reachable') {
+      throw new Error(nextActionForStatus(check.state))
+    }
+
+    const config = await loadConfigSummary()
+    state.configSummary = config.summary
+    state.configLoadError = config.error
+
+    if (config.error) {
+      throw new Error(`Config refresh failed: ${config.error}`)
+    }
+
     state.notice = 'Configuration refreshed'
+  })
+}
+
+async function copyEndpoint(kind: string | undefined): Promise<void> {
+  if (kind !== 'management' && kind !== 'origin') {
+    return
+  }
+
+  await runAction(`copy:${kind}`, async () => {
+    const value = getSafeEndpoint(kind)
+
+    if (!value) {
+      throw new Error('Endpoint is unavailable')
+    }
+
+    if (!navigator.clipboard?.writeText) {
+      throw new Error('Clipboard is unavailable')
+    }
+
+    await navigator.clipboard.writeText(value)
+    state.notice = `Copied ${kind === 'management' ? 'Management URL' : 'Service Origin'}`
   })
 }
 
@@ -472,6 +660,7 @@ function editProvider(name: string): void {
   state.providerDraft = {
     name: provider.name,
     baseUrl: provider.baseUrl,
+    proxyUrl: '',
     disabled: provider.disabled,
     models:
       provider.models.length > 0
@@ -486,7 +675,11 @@ function editProvider(name: string): void {
 }
 
 async function deleteProvider(name: string): Promise<void> {
-  if (!name) {
+  if (!name || !isRuntimeReachable()) {
+    return
+  }
+
+  if (!window.confirm(`Delete provider "${name}"?`)) {
     return
   }
 
@@ -496,6 +689,7 @@ async function deleteProvider(name: string): Promise<void> {
     })
 
     state.configSummary = result.summary
+    state.configLoadError = null
     state.providerDraft = emptyProviderDraft()
     state.selectedProviderName = null
     state.notice = 'Provider deleted'
@@ -533,6 +727,7 @@ function readProviderDraftFromForm(): ProviderDraft {
   return {
     name: stringValue(data.get('name')).trim(),
     baseUrl: stringValue(data.get('baseUrl')).trim(),
+    proxyUrl: stringValue(data.get('proxyUrl')).trim(),
     disabled: data.get('disabled') === 'on',
     models: readModelRows(form).map((model) => ({
       name: model.name ?? '',
@@ -571,7 +766,11 @@ function connectionKeyLabel(): string {
 }
 
 function providerCountLabel(): string {
-  const count = state.configSummary?.openAiCompatibilityProviders.length ?? 0
+  if (!state.configSummary) {
+    return 'Config not loaded'
+  }
+
+  const count = state.configSummary.openAiCompatibilityProviders.length
   return `${count} provider${count === 1 ? '' : 's'}`
 }
 
@@ -596,6 +795,27 @@ function statusLabel(status: RuntimeState['status'] | undefined): string {
   }
 }
 
+function nextActionForStatus(status: RuntimeState['status'] | undefined): string {
+  switch (status) {
+    case 'reachable':
+      return 'Refresh config or edit providers.'
+    case 'auth_required':
+      return 'Enter or replace the management key, then test again.'
+    case 'management_disabled':
+      return 'Enable the CLIProxyAPI Management API before continuing.'
+    case 'unreachable':
+      return 'Confirm CLIProxyAPI is running and the URL is correct.'
+    case 'timeout':
+      return 'Increase the timeout or check whether the runtime is blocked.'
+    case 'invalid_response':
+      return 'Verify this URL points to the CLIProxyAPI Management API.'
+    case 'unexpected_error':
+      return 'Review the redacted diagnostic, then retry.'
+    default:
+      return 'Loading local runtime settings.'
+  }
+}
+
 function statusClass(status: RuntimeState['status'] | undefined): string {
   switch (status) {
     case 'reachable':
@@ -611,6 +831,51 @@ function statusClass(status: RuntimeState['status'] | undefined): string {
     default:
       return 'status-idle'
   }
+}
+
+function isRuntimeReachable(): boolean {
+  return state.runtimeState?.status === 'reachable'
+}
+
+function getSafeEndpoint(kind: SafeEndpointKind): string | null {
+  const baseUrl = state.runtimeState?.connection.baseUrl.trim()
+
+  if (!baseUrl) {
+    return null
+  }
+
+  const url = toSafeUrl(baseUrl)
+
+  if (!url) {
+    return null
+  }
+
+  return kind === 'origin' ? url.origin : url.toString()
+}
+
+function toSafeUrl(value: string): URL | null {
+  try {
+    const url = new URL(value)
+    url.username = ''
+    url.password = ''
+    return url
+  } catch {
+    return null
+  }
+}
+
+function formatCheckedAt(value: string | undefined): string {
+  if (!value) {
+    return 'Never'
+  }
+
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown'
+  }
+
+  return date.toLocaleString()
 }
 
 function isBusy(action: string): string {

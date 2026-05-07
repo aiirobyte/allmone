@@ -67,6 +67,11 @@ input:focus {
   outline-offset: 0;
 }
 
+input[readonly] {
+  background: #f6f8fb;
+  color: #4b5563;
+}
+
 #app {
   min-height: 100vh;
 }
@@ -287,6 +292,89 @@ label {
   margin: 4px 0 0;
   color: #111827;
   font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.state-action,
+.empty-callout {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  border: 1px solid #dfe5ed;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.state-action strong,
+.empty-callout strong {
+  color: #111827;
+  font-size: 0.88rem;
+}
+
+.state-action span,
+.empty-callout span {
+  color: #4b5563;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.diagnostic {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  border: 1px solid #e2bd75;
+  border-radius: 6px;
+  background: #fffaf0;
+  padding: 10px;
+}
+
+.diagnostic span,
+.copy-row span {
+  color: #6b7280;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+code {
+  overflow-wrap: anywhere;
+  color: #26313d;
+  font-family:
+    "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.copy-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.copy-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #e0e6ee;
+  border-radius: 6px;
+  padding: 9px;
+}
+
+.copy-row div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.copy-row button {
+  min-width: 76px;
+}
+
+.inline-warning {
+  margin-top: 10px;
+  color: #8a4f06;
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .provider-grid {
@@ -350,12 +438,43 @@ label {
   color: #1f2937;
 }
 
+.empty-list span {
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
 .provider-form {
   display: grid;
   gap: 14px;
   border: 1px solid #dfe5ed;
   border-radius: 8px;
   padding: 14px;
+}
+
+.form-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid #e6ebf2;
+  padding-bottom: 10px;
+}
+
+.form-mode strong {
+  color: #111827;
+  font-size: 0.92rem;
+}
+
+.form-mode span,
+.form-note {
+  color: #687386;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.form-note {
+  margin: -3px 0 0;
 }
 
 .models-header {
@@ -415,6 +534,7 @@ label {
 
   .form-grid,
   .status-grid,
+  .copy-row,
   .model-row {
     grid-template-columns: 1fr;
   }

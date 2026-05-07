@@ -1,4 +1,4 @@
-# allmone
+# Allmone - All llm in one.
 
 All your LLM models in one place.
 
@@ -80,6 +80,6 @@ docs/
 
 ## Current Target
 
-Current roadmap target: v0.1.3 Runtime Connection GUI Hardening.
+Current roadmap target: v0.1.4 Tray MVP.
 
 See `docs/todo.md` for the next executable prompt.

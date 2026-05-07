@@ -103,16 +103,21 @@ class DefaultRuntimeService implements RuntimeService {
   async testConnection(): Promise<CliProxyApiManagementCheckResult> {
     const client = this.getClient()
     const result = await client.checkManagementApi()
+    const redactedError = result.error
+      ? redactCliProxyApiText(result.error)
+      : undefined
 
     this.state = {
       ...this.getState(),
       status: result.state,
-      lastError: result.error ? redactCliProxyApiText(result.error) : undefined
+      lastError: redactedError,
+      lastCheckedAt: new Date().toISOString(),
+      lastHttpStatus: result.status
     }
 
     return {
       ...result,
-      error: result.error ? redactCliProxyApiText(result.error) : undefined
+      error: redactedError
     }
   }
 

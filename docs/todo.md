@@ -10,40 +10,43 @@ Read CLAUDE.md and docs/todo.md, then continue with the active version's next un
 
 ## Active Version
 
-Active version: `0.1.3` planned
+Active version: `0.1.4` planned
 
-- Previous version: `docs/version/0.1.2/`
-- Active version docs: `docs/version/0.1.3/` not created yet
+- Previous version: `docs/version/0.1.3/`
+- Active version docs: `docs/version/0.1.4/` pending
 
 ## Current Target
 
-Target: v0.1.3 Runtime Connection GUI Hardening.
+Target: v0.1.4 Tray MVP.
 
 Definition of done:
 
-- [ ] Create `docs/version/0.1.3/spec.md`.
-- [ ] Create `docs/version/0.1.3/prompt_plan.md`.
-- [ ] Create `docs/version/0.1.3/todo.md`.
-- [ ] Harden runtime connection diagnostics and empty states.
-- [ ] Add endpoint copy helpers and safer provider editing affordances.
-- [ ] Keep secrets out of renderer localStorage/sessionStorage/logs.
-- [ ] Keep allmone free of API proxying/provider adapter code.
-- [ ] Run the verification commands selected by the v0.1.3 plan.
+- [x] Create `docs/version/0.1.3/spec.md`.
+- [x] Create `docs/version/0.1.3/prompt_plan.md`.
+- [x] Create `docs/version/0.1.3/todo.md`.
+- [x] Harden runtime connection diagnostics and empty states.
+- [x] Add endpoint copy helpers and safer provider editing affordances.
+- [x] Keep secrets out of renderer localStorage/sessionStorage/logs.
+- [x] Keep allmone free of API proxying/provider adapter code.
+- [x] Run the verification commands selected by the v0.1.3 plan.
+- [ ] Create `docs/version/0.1.4/spec.md`.
+- [ ] Create `docs/version/0.1.4/prompt_plan.md`.
+- [ ] Create `docs/version/0.1.4/todo.md`.
 
 ## Next Prompt
 
-Start v0.1.3 planning from the roadmap.
+Create the v0.1.4 version plan from the roadmap and v0.1.3 handoff.
 
 Expected next change:
 
-- Create `docs/version/0.1.3/` planning files before implementation.
+- Draft the Tray MVP spec, prompt plan, and todo under `docs/version/0.1.4/`.
 
 ## Version Roadmap
 
 - [x] v0.1.0 Planning Baseline: product docs, README, and agent loop.
 - [x] v0.1.1 Runtime Contract Spike: CLIProxyAPI management types, client, redaction, and tests.
 - [x] v0.1.2 Runtime Service And Minimal Config Renderer: main-process status service, settings storage, typed IPC, and simple config UI.
-- [ ] v0.1.3 Runtime Connection GUI Hardening: diagnostics, endpoint copy, empty states, and editing affordances.
+- [x] v0.1.3 Runtime Connection GUI Hardening: diagnostics, endpoint copy, empty states, and editing affordances.
 - [ ] v0.1.4 Tray MVP: tray status and quick actions.
 - [ ] v0.2.0 Auth Management Surface: API/auth resources through CLIProxyAPI.
 - [ ] v0.3.0 Model Resource Inventory: model-first inventory with backing provider/auth details.
