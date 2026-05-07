@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { parse, stringify } from 'yaml'
 
@@ -37,18 +37,12 @@ export interface AllmoneSoftwareConfigInput {
 
 export interface AllmoneConfigStoreOptions {
   runtimeHome: RuntimeHomePaths
-  legacySettingsFilePath?: string
+  oldSettingsFilePath?: string
 }
 
 export interface AllmoneConfigStore {
   load(): Promise<AllmoneSoftwareConfig>
   save(input: AllmoneSoftwareConfigInput): Promise<AllmoneSoftwareConfig>
-}
-
-interface LegacyRuntimeSettings {
-  connection?: {
-    baseUrl?: string
-  }
 }
 
 export function createAllmoneConfigStore(
@@ -59,15 +53,16 @@ export function createAllmoneConfigStore(
 
 class FileAllmoneConfigStore implements AllmoneConfigStore {
   private readonly runtimeHome: RuntimeHomePaths
-  private readonly legacySettingsFilePath: string | undefined
+  private readonly oldSettingsFilePath: string | undefined
 
   constructor(options: AllmoneConfigStoreOptions) {
     this.runtimeHome = options.runtimeHome
-    this.legacySettingsFilePath = options.legacySettingsFilePath
+    this.oldSettingsFilePath = options.oldSettingsFilePath
   }
 
   async load(): Promise<AllmoneSoftwareConfig> {
     await ensureRuntimeHome(this.runtimeHome)
+    await this.deleteOldSettingsFile()
 
     const raw = await this.readConfigFile()
     const config =
@@ -110,11 +105,6 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
   }
 
   private async createDefaultConfig(): Promise<AllmoneSoftwareConfig> {
-    const legacy = await this.readLegacyRuntimeSettings()
-    const legacyRuntime = legacy?.connection?.baseUrl
-      ? parseLegacyManagementBaseUrl(legacy.connection.baseUrl)
-      : undefined
-
     return this.normalizeConfig({
       version: CONFIG_VERSION,
       cliproxyapi: {
@@ -123,26 +113,19 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
         localExecutablePath: this.runtimeHome.cliProxyApiExecutablePath
       },
       runtime: {
-        host: legacyRuntime?.host ?? DEFAULT_HOST,
-        port: legacyRuntime?.port ?? DEFAULT_PORT,
+        host: DEFAULT_HOST,
+        port: DEFAULT_PORT,
         configPath: this.runtimeHome.runtimeConfigPath
       }
     })
   }
 
-  private async readLegacyRuntimeSettings(): Promise<LegacyRuntimeSettings | undefined> {
-    if (!this.legacySettingsFilePath) {
-      return undefined
+  private async deleteOldSettingsFile(): Promise<void> {
+    if (!this.oldSettingsFilePath) {
+      return
     }
 
-    try {
-      const raw = await readFile(this.legacySettingsFilePath, 'utf8')
-      const parsed = JSON.parse(raw) as LegacyRuntimeSettings
-
-      return parsed && typeof parsed === 'object' ? parsed : undefined
-    } catch {
-      return undefined
-    }
+    await rm(this.oldSettingsFilePath, { force: true })
   }
 
   private normalizeConfig(value: unknown): AllmoneSoftwareConfig {
@@ -358,24 +341,6 @@ function buildApiBaseUrl(host: string, port: number): string {
 
 function buildManagementBaseUrl(host: string, port: number): string {
   return `http://${host}:${port}/v0/management`
-}
-
-function parseLegacyManagementBaseUrl(
-  value: string
-): { host: string; port: number } | undefined {
-  try {
-    const url = new URL(value)
-    const port = Number(url.port)
-    const host = normalizeHost(url.hostname)
-
-    if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-      return undefined
-    }
-
-    return { host, port }
-  } catch {
-    return undefined
-  }
 }
 
 function isMissingFileError(error: unknown): boolean {

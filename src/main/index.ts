@@ -46,7 +46,7 @@ app.whenReady().then(async () => {
   const runtimeHome = resolveRuntimeHome()
   const allmoneConfigStore = createAllmoneConfigStore({
     runtimeHome,
-    legacySettingsFilePath: join(app.getPath('userData'), 'runtime-settings.json')
+    oldSettingsFilePath: join(app.getPath('userData'), 'runtime-settings.json')
   })
   const settingsStore = createRuntimeSettingsStore({ app, safeStorage })
   const runtimeService = createRuntimeService({ settingsStore })

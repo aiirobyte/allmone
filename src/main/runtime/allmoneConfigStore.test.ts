@@ -131,15 +131,15 @@ test('rejects invalid release metadata URLs', async () => {
   })
 })
 
-test('uses old userData runtime settings as a first-run fallback without deleting them', async () => {
+test('deletes old userData runtime settings without migrating values', async () => {
   await withTempRuntimeHome(async (homeDir) => {
     const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
-    const legacyDir = join(homeDir, 'legacy-user-data')
-    const legacySettingsFilePath = join(legacyDir, 'runtime-settings.json')
+    const oldUserDataDir = join(homeDir, 'old-user-data')
+    const oldSettingsFilePath = join(oldUserDataDir, 'runtime-settings.json')
 
-    await mkdir(legacyDir, { recursive: true })
+    await mkdir(oldUserDataDir, { recursive: true })
     await writeFile(
-      legacySettingsFilePath,
+      oldSettingsFilePath,
       JSON.stringify(
         {
           connection: {
@@ -155,20 +155,19 @@ test('uses old userData runtime settings as a first-run fallback without deletin
 
     const store = createAllmoneConfigStore({
       runtimeHome,
-      legacySettingsFilePath
+      oldSettingsFilePath
     })
     const config = await store.load()
     const raw = await readFile(runtimeHome.configPath, 'utf8')
-    const legacyRaw = await readFile(legacySettingsFilePath, 'utf8')
 
     assert.equal(config.runtime.host, '127.0.0.1')
-    assert.equal(config.runtime.port, 9001)
-    assert.equal(config.runtime.apiBaseUrl, 'http://127.0.0.1:9001/v1')
+    assert.equal(config.runtime.port, 8317)
+    assert.equal(config.runtime.apiBaseUrl, 'http://127.0.0.1:8317/v1')
     assert.equal(
       config.runtime.managementBaseUrl,
-      'http://127.0.0.1:9001/v0/management'
+      'http://127.0.0.1:8317/v0/management'
     )
     assert(!raw.includes('encrypted-secret'))
-    assert(legacyRaw.includes('encrypted-secret'))
+    await assert.rejects(() => readFile(oldSettingsFilePath, 'utf8'), /ENOENT/)
   })
 })

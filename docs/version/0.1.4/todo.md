@@ -68,5 +68,5 @@ Expected next change:
 
 ## Implementation Notes
 
-- Prompt 0 completed on 2026-05-07: added runtime home resolution, directory creation, YAML software config defaults/validation, and old userData settings fallback.
+- Prompt 0 completed on 2026-05-07: added runtime home resolution, directory creation, YAML software config defaults/validation, and old userData settings deletion.
 - Prompt 0 verification passed: `bun run test`, `bun run typecheck`.
