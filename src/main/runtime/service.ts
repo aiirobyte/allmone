@@ -11,6 +11,11 @@ import {
   type CliProxyApiOpenAiCompatibilityProviderInput,
   type CliProxyApiWriteResult
 } from '../cliproxyapi'
+import type {
+  AllmoneConfigStore,
+  AllmoneSoftwareConfig
+} from './allmoneConfigStore'
+import type { CliProxyApiConfigWriter } from './cliproxyapiConfigWriter'
 import type { RuntimeSettingsStore } from './settingsStore'
 import type {
   RuntimeConfigSummary,
@@ -38,6 +43,8 @@ export type RuntimeClientFactory = (
 
 export interface RuntimeServiceOptions {
   settingsStore: RuntimeSettingsStore
+  allmoneConfigStore?: AllmoneConfigStore
+  cliProxyApiConfigWriter?: CliProxyApiConfigWriter
   createClient?: RuntimeClientFactory
 }
 
@@ -47,6 +54,7 @@ export interface RuntimeService {
   saveConnectionSettings(
     input: RuntimeConnectionSettingsInput
   ): Promise<RuntimeState>
+  saveOutputPort(port: number): Promise<RuntimeState>
   testConnection(): Promise<CliProxyApiManagementCheckResult>
   getConfigSummary(): Promise<RuntimeConfigSummary>
   upsertOpenAiCompatibilityProvider(
@@ -60,25 +68,32 @@ export interface RuntimeService {
 export function createRuntimeService(
   options: RuntimeServiceOptions
 ): RuntimeService {
-  return new DefaultRuntimeService(
-    options.settingsStore,
-    options.createClient ?? createCliProxyApiClient
-  )
+  return new DefaultRuntimeService(options)
 }
 
 class DefaultRuntimeService implements RuntimeService {
   private loadedSettings: RuntimeLoadedSettings | undefined
   private client: RuntimeCliProxyApiClient | undefined
   private state: RuntimeState | undefined
+  private readonly settingsStore: RuntimeSettingsStore
+  private readonly allmoneConfigStore: AllmoneConfigStore | undefined
+  private readonly cliProxyApiConfigWriter: CliProxyApiConfigWriter | undefined
+  private readonly createClient: RuntimeClientFactory
 
-  constructor(
-    private readonly settingsStore: RuntimeSettingsStore,
-    private readonly createClient: RuntimeClientFactory
-  ) {}
+  constructor(options: RuntimeServiceOptions) {
+    this.settingsStore = options.settingsStore
+    this.allmoneConfigStore = options.allmoneConfigStore
+    this.cliProxyApiConfigWriter = options.cliProxyApiConfigWriter
+    this.createClient = options.createClient ?? createCliProxyApiClient
+  }
 
   async initialize(): Promise<void> {
     const loaded = await this.settingsStore.load()
-    this.applyLoadedSettings(loaded)
+    const managedConfig = await this.loadManagedConfig({ writeRuntimeConfig: true })
+
+    this.applyLoadedSettings(
+      managedConfig ? withManagedBaseUrl(loaded, managedConfig) : loaded
+    )
   }
 
   getState(): RuntimeState {
@@ -96,7 +111,29 @@ class DefaultRuntimeService implements RuntimeService {
     input: RuntimeConnectionSettingsInput
   ): Promise<RuntimeState> {
     const loaded = await this.settingsStore.saveConnectionSettings(input)
-    this.applyLoadedSettings(loaded)
+    const managedConfig = await this.loadManagedConfig()
+
+    this.applyLoadedSettings(
+      managedConfig ? withManagedBaseUrl(loaded, managedConfig) : loaded
+    )
+    return this.getState()
+  }
+
+  async saveOutputPort(port: number): Promise<RuntimeState> {
+    this.ensureInitialized()
+
+    if (!this.cliProxyApiConfigWriter) {
+      throw new Error('Managed runtime config writer is not available')
+    }
+
+    const config = await this.cliProxyApiConfigWriter.saveOutputPort(port)
+    const loaded = this.loadedSettings
+
+    if (!loaded) {
+      throw new Error('Runtime service is not initialized')
+    }
+
+    this.applyLoadedSettings(withManagedBaseUrl(loaded, config))
     return this.getState()
   }
 
@@ -182,6 +219,16 @@ class DefaultRuntimeService implements RuntimeService {
     }
   }
 
+  private async loadManagedConfig(options: {
+    writeRuntimeConfig?: boolean
+  } = {}): Promise<AllmoneSoftwareConfig | undefined> {
+    if (options.writeRuntimeConfig && this.cliProxyApiConfigWriter) {
+      return await this.cliProxyApiConfigWriter.writeManagedConfig()
+    }
+
+    return await this.allmoneConfigStore?.load()
+  }
+
   private getClient(): RuntimeCliProxyApiClient {
     this.ensureInitialized()
     const client = this.client
@@ -196,6 +243,19 @@ class DefaultRuntimeService implements RuntimeService {
   private ensureInitialized(): void {
     if (!this.loadedSettings || !this.client || !this.state) {
       throw new Error('Runtime service is not initialized')
+    }
+  }
+}
+
+function withManagedBaseUrl(
+  loaded: RuntimeLoadedSettings,
+  config: AllmoneSoftwareConfig
+): RuntimeLoadedSettings {
+  return {
+    ...loaded,
+    connection: {
+      ...loaded.connection,
+      baseUrl: config.runtime.managementBaseUrl
     }
   }
 }

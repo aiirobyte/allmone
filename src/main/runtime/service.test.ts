@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 
 import { CliProxyApiError, type CliProxyApiConfigResult } from '../cliproxyapi'
+import type {
+  AllmoneConfigStore,
+  AllmoneSoftwareConfig
+} from './allmoneConfigStore'
+import type { CliProxyApiConfigWriter } from './cliproxyapiConfigWriter'
 import {
   createRuntimeService,
   type RuntimeCliProxyApiClient,
@@ -55,6 +60,37 @@ function createFakeClient(
       return { ok: true, status: 200, raw: { status: 'ok' } }
     },
     ...overrides
+  }
+}
+
+function managedSoftwareConfig(port = 9444): AllmoneSoftwareConfig {
+  return {
+    version: 1,
+    cliproxyapi: {
+      releaseMetadataUrl: 'https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest',
+      releasePageUrl: 'https://github.com/router-for-me/CLIProxyAPI/releases/latest',
+      localExecutablePath: '/tmp/allmone/runtime/bin/cli-proxy-api'
+    },
+    runtime: {
+      host: '127.0.0.1',
+      port,
+      configPath: '/tmp/allmone/runtime/config.yaml',
+      apiBaseUrl: `http://127.0.0.1:${port}/v1`,
+      managementBaseUrl: `http://127.0.0.1:${port}/v0/management`
+    }
+  }
+}
+
+function createFakeAllmoneConfigStore(
+  config: AllmoneSoftwareConfig
+): AllmoneConfigStore {
+  return {
+    async load() {
+      return config
+    },
+    async save() {
+      return config
+    }
   }
 }
 
@@ -170,6 +206,92 @@ test('rebuilds the CLIProxyAPI client after saving connection settings', async (
     baseUrl: 'http://localhost:9000/v0/management',
     managementKey: 'new-management-key',
     timeoutMs: 2500
+  })
+})
+
+test('derives the management base URL from managed software config', async () => {
+  const store = createFakeStore(
+    loadedSettings({
+      connection: {
+        baseUrl: 'http://localhost:8317/v0/management',
+        timeoutMs: 5000,
+        managementKeyConfigured: true,
+        managementKeyPersisted: true
+      },
+      managementKey: 'mgmt-secret'
+    })
+  )
+  const seenOptions: Array<{
+    baseUrl?: string
+    managementKey?: string
+    timeoutMs?: number
+  }> = []
+  const createClient: RuntimeClientFactory = (options) => {
+    seenOptions.push(options)
+    return createFakeClient()
+  }
+  const configWriter: CliProxyApiConfigWriter = {
+    async writeManagedConfig() {
+      return managedSoftwareConfig(9444)
+    },
+    async saveOutputPort(port) {
+      return managedSoftwareConfig(port)
+    }
+  }
+  const service = createRuntimeService({
+    settingsStore: store,
+    allmoneConfigStore: createFakeAllmoneConfigStore(managedSoftwareConfig(9444)),
+    cliProxyApiConfigWriter: configWriter,
+    createClient
+  })
+
+  await service.initialize()
+
+  assert.deepEqual(seenOptions.at(-1), {
+    baseUrl: 'http://127.0.0.1:9444/v0/management',
+    managementKey: 'mgmt-secret',
+    timeoutMs: 5000
+  })
+  assert.equal(
+    service.getState().connection.baseUrl,
+    'http://127.0.0.1:9444/v0/management'
+  )
+})
+
+test('saves managed output ports and rebuilds the runtime client', async () => {
+  const store = createFakeStore(loadedSettings())
+  const seenOptions: Array<{
+    baseUrl?: string
+    managementKey?: string
+    timeoutMs?: number
+  }> = []
+  const createClient: RuntimeClientFactory = (options) => {
+    seenOptions.push(options)
+    return createFakeClient()
+  }
+  const configWriter: CliProxyApiConfigWriter = {
+    async writeManagedConfig() {
+      return managedSoftwareConfig(8317)
+    },
+    async saveOutputPort(port) {
+      return managedSoftwareConfig(port)
+    }
+  }
+  const service = createRuntimeService({
+    settingsStore: store,
+    allmoneConfigStore: createFakeAllmoneConfigStore(managedSoftwareConfig(8317)),
+    cliProxyApiConfigWriter: configWriter,
+    createClient
+  })
+
+  await service.initialize()
+  const state = await service.saveOutputPort(9555)
+
+  assert.equal(state.connection.baseUrl, 'http://127.0.0.1:9555/v0/management')
+  assert.deepEqual(seenOptions.at(-1), {
+    baseUrl: 'http://127.0.0.1:9555/v0/management',
+    managementKey: 'mgmt-secret',
+    timeoutMs: 5000
   })
 })
 

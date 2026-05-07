@@ -12,16 +12,16 @@ Definition of done:
 - [x] Create `docs/version/0.1.4/spec.md`.
 - [x] Create `docs/version/0.1.4/prompt_plan.md`.
 - [x] Create `docs/version/0.1.4/todo.md`.
-- [ ] Create and use `~/.allmone` for managed runtime files.
-- [ ] Store non-secret software configuration in `~/.allmone/config.yaml`.
-- [ ] Store CLIProxyAPI download address and local executable path in software configuration.
-- [ ] Store install metadata at `~/.allmone/runtime/install.json`.
-- [ ] Download missing CLIProxyAPI executable from official releases.
-- [ ] Check official release metadata and safely update stale managed executables.
+- [x] Create and use `~/.allmone` for managed runtime files.
+- [x] Store non-secret software configuration in `~/.allmone/config.yaml`.
+- [x] Store CLIProxyAPI download address and local executable path in software configuration.
+- [x] Store install metadata at `~/.allmone/runtime/install.json`.
+- [x] Download missing CLIProxyAPI executable from official releases.
+- [x] Check official release metadata and safely update stale managed executables.
 - [ ] Launch the managed executable from `~/.allmone/runtime/bin/`.
 - [ ] Restart and shutdown the allmone-managed CLIProxyAPI process.
-- [ ] Generate and patch `~/.allmone/runtime/config.yaml` without erasing provider config.
-- [ ] Let allmone own and save the API output port.
+- [x] Generate and patch `~/.allmone/runtime/config.yaml` without erasing provider config.
+- [x] Let allmone own and save the API output port.
 - [ ] Derive and expose the safe OpenAI-compatible API base URL.
 - [ ] Add tray status and quick actions.
 - [ ] Keep secrets out of renderer localStorage/sessionStorage/IndexedDB/logs.
@@ -33,11 +33,11 @@ Definition of done:
 
 ## Next Prompt
 
-Start v0.1.4 Prompt 0 from `docs/version/0.1.4/prompt_plan.md`.
+Start v0.1.4 Prompt 3 from `docs/version/0.1.4/prompt_plan.md`.
 
 Expected next change:
 
-- Implement runtime home resolution and YAML software config under `~/.allmone`.
+- Implement managed CLIProxyAPI process launch, restart, and shutdown.
 
 ## Guardrails
 
@@ -65,3 +65,12 @@ Expected next change:
 - API output port is allmone-owned and should update CLIProxyAPI config plus derived safe URLs.
 - Existing managed executable should launch even when update checks fail.
 - Port changes should restart the managed process after writing config.
+
+## Implementation Notes
+
+- Prompt 0 completed on 2026-05-07: added runtime home resolution, directory creation, YAML software config defaults/validation, and old userData settings deletion.
+- Prompt 0 verification passed: `bun run test`, `bun run typecheck`.
+- Prompt 1 completed on 2026-05-07: added official CLIProxyAPI release asset matching, injected download/checksum/archive installation, safe executable replacement, and non-secret install metadata.
+- Prompt 1 verification passed: `bun run test`, `bun run typecheck`.
+- Prompt 2 completed on 2026-05-07: added managed CLIProxyAPI YAML config patching, output port validation/save flow, derived Management API base URL initialization, and provider/payload preservation tests.
+- Prompt 2 verification passed: `bun run test`, `bun run typecheck`.
