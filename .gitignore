@@ -62,12 +62,3 @@ Desktop.ini
 tmp/
 temp/
 .cache/
-
-# Agent files
-.codex/
-.claude/
-.agents/
-docs/
-CONTEXT.md
-AGENT.md
-CLAUDE.md
