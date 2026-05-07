@@ -19,7 +19,7 @@ Preserve user changes and keep secrets out of renderer storage.
 
 Current next prompt:
 
-- Start v0.1.4 Prompt 1: Official CLIProxyAPI Installer And Updater.
+- Start v0.1.4 Prompt 3: Process Launch, Restart, And Shutdown.
 
 ## Operating Rule
 

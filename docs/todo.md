@@ -38,11 +38,11 @@ Definition of done:
 
 ## Next Prompt
 
-Start v0.1.4 Prompt 1 from `docs/version/0.1.4/prompt_plan.md`.
+Start v0.1.4 Prompt 3 from `docs/version/0.1.4/prompt_plan.md`.
 
 Expected next change:
 
-- Implement the official CLIProxyAPI installer and updater.
+- Implement managed CLIProxyAPI process launch, restart, and shutdown.
 
 ## Version Roadmap
 

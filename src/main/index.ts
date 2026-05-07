@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, safeStorage, shell } from 'electron'
 import { join } from 'node:path'
 
 import { createAllmoneConfigStore } from './runtime/allmoneConfigStore'
+import { createCliProxyApiConfigWriter } from './runtime/cliproxyapiConfigWriter'
 import { registerRuntimeIpcHandlers } from './runtime/ipc'
 import { resolveRuntimeHome } from './runtime/runtimeHome'
 import { createRuntimeService } from './runtime/service'
@@ -49,7 +50,15 @@ app.whenReady().then(async () => {
     oldSettingsFilePath: join(app.getPath('userData'), 'runtime-settings.json')
   })
   const settingsStore = createRuntimeSettingsStore({ app, safeStorage })
-  const runtimeService = createRuntimeService({ settingsStore })
+  const cliProxyApiConfigWriter = createCliProxyApiConfigWriter({
+    runtimeHome,
+    configStore: allmoneConfigStore
+  })
+  const runtimeService = createRuntimeService({
+    settingsStore,
+    allmoneConfigStore,
+    cliProxyApiConfigWriter
+  })
 
   await allmoneConfigStore.load()
   await runtimeService.initialize()

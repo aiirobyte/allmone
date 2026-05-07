@@ -56,6 +56,9 @@ function createFakeService(): RuntimeService & {
       this.savedPayloads.push(input)
       return this.getState()
     },
+    async saveOutputPort() {
+      return this.getState()
+    },
     async testConnection() {
       return { ok: true, state: 'reachable', status: 200 }
     },
