@@ -6,19 +6,20 @@ Specific version prompt plans live under `docs/version/<semver>/prompt_plan.md`.
 
 ## Active Version
 
-Plan v0.1.4 from the roadmap:
+Implement v0.1.4 from the version prompt plan:
 
 ```text
-Read docs/spec.md.
+Read CLAUDE.md.
 Read docs/todo.md.
-Read docs/version/0.1.3/spec.md for the handoff.
-Create docs/version/0.1.4/spec.md, prompt_plan.md, and todo.md.
+Read docs/version/0.1.4/spec.md.
+Read docs/version/0.1.4/prompt_plan.md.
+Continue from the next unchecked item in docs/version/0.1.4/todo.md.
 Preserve user changes and keep secrets out of renderer storage.
 ```
 
 Current next prompt:
 
-- Create the v0.1.4 Tray MVP version plan from the roadmap and v0.1.3 handoff.
+- Start v0.1.4 Prompt 0: Runtime Home And Software Config.
 
 ## Operating Rule
 

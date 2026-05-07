@@ -19,4 +19,4 @@ The root files in `docs/` are the current-session entry points. They point agent
 - `0.1.1`: CLIProxyAPI Runtime Contract Spike. Complete.
 - `0.1.2`: Runtime Service And Minimal Config Renderer. Complete.
 - `0.1.3`: Runtime Connection GUI Hardening. Complete.
-- `0.1.4`: Tray MVP. Planned, docs pending.
+- `0.1.4`: Managed CLIProxyAPI Runtime, Software Config, And Tray MVP. Planned.

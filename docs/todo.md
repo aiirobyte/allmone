@@ -13,11 +13,11 @@ Read CLAUDE.md and docs/todo.md, then continue with the active version's next un
 Active version: `0.1.4` planned
 
 - Previous version: `docs/version/0.1.3/`
-- Active version docs: `docs/version/0.1.4/` pending
+- Active version docs: `docs/version/0.1.4/`
 
 ## Current Target
 
-Target: v0.1.4 Tray MVP.
+Target: v0.1.4 Managed CLIProxyAPI Runtime, Software Config, And Tray MVP.
 
 Definition of done:
 
@@ -29,17 +29,17 @@ Definition of done:
 - [x] Keep secrets out of renderer localStorage/sessionStorage/logs.
 - [x] Keep allmone free of API proxying/provider adapter code.
 - [x] Run the verification commands selected by the v0.1.3 plan.
-- [ ] Create `docs/version/0.1.4/spec.md`.
-- [ ] Create `docs/version/0.1.4/prompt_plan.md`.
-- [ ] Create `docs/version/0.1.4/todo.md`.
+- [x] Create `docs/version/0.1.4/spec.md`.
+- [x] Create `docs/version/0.1.4/prompt_plan.md`.
+- [x] Create `docs/version/0.1.4/todo.md`.
 
 ## Next Prompt
 
-Create the v0.1.4 version plan from the roadmap and v0.1.3 handoff.
+Start v0.1.4 Prompt 0 from `docs/version/0.1.4/prompt_plan.md`.
 
 Expected next change:
 
-- Draft the Tray MVP spec, prompt plan, and todo under `docs/version/0.1.4/`.
+- Implement runtime home resolution and YAML software config under `~/.allmone`.
 
 ## Version Roadmap
 
@@ -47,7 +47,7 @@ Expected next change:
 - [x] v0.1.1 Runtime Contract Spike: CLIProxyAPI management types, client, redaction, and tests.
 - [x] v0.1.2 Runtime Service And Minimal Config Renderer: main-process status service, settings storage, typed IPC, and simple config UI.
 - [x] v0.1.3 Runtime Connection GUI Hardening: diagnostics, endpoint copy, empty states, and editing affordances.
-- [ ] v0.1.4 Tray MVP: tray status and quick actions.
+- [ ] v0.1.4 Managed CLIProxyAPI Runtime, Software Config, And Tray MVP: YAML config, official download/update, process control, port ownership, tray status, and quick actions.
 - [ ] v0.2.0 Auth Management Surface: API/auth resources through CLIProxyAPI.
 - [ ] v0.3.0 Model Resource Inventory: model-first inventory with backing provider/auth details.
 - [ ] v0.4.0 Usage And Logs: request log, usage, queue, and error visibility.
@@ -56,7 +56,7 @@ Expected next change:
 
 ## Decisions To Confirm
 
-- [ ] CLIProxyAPI install strategy: discover existing install, bundle binary, or both.
+- [x] CLIProxyAPI install strategy: download/update official releases into `~/.allmone` and manage that executable.
 - [ ] Minimum supported CLIProxyAPI version and management API contract.
 - [ ] Secure storage library for secrets.
 - [ ] Which usage fields are authoritative versus estimates.

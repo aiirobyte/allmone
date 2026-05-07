@@ -9,7 +9,7 @@ This file is the current planning entry point. Specific version plans live under
 Active version: `0.1.4` planned
 
 - Previous version: `docs/version/0.1.3/`
-- Active version docs: `docs/version/0.1.4/` pending
+- Active version docs: `docs/version/0.1.4/`
 
 ## Product Intent
 
@@ -27,7 +27,7 @@ If a feature would require allmone to parse provider protocols, route API traffi
 - `0.1.1`: CLIProxyAPI Runtime Contract Spike. Complete.
 - `0.1.2`: Runtime service and minimal config renderer. Complete.
 - `0.1.3`: Runtime connection GUI hardening. Complete.
-- `0.1.4`: Tray MVP. Planned.
+- `0.1.4`: Managed CLIProxyAPI runtime, software config, and tray MVP. Planned.
 - `0.2.0`: Auth management surface. Planned.
 - `0.3.0`: Model-first resource inventory. Planned.
 - `0.4.0`: Usage and logs. Planned.
