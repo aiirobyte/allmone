@@ -1,7 +1,7 @@
 # allmone v0.2.0 Prompt Plan
 
 Last updated: 2026-05-09
-Status: In Progress
+Status: Complete
 
 ## Version Target
 
@@ -34,7 +34,7 @@ Guardrails:
 
 ### Prompt 1: Multi Auth File Management Surface
 
-Status: Pending
+Status: Complete
 
 Goal: Show and manage multiple persisted auth files across multiple providers using CLIProxyAPI summaries plus supported add/delete handoffs.
 
@@ -56,7 +56,7 @@ Guardrails:
 
 ### Prompt 2: Multi Provider Persistent Add/Delete Surface
 
-Status: Pending
+Status: Complete
 
 Goal: Make provider add/delete management explicit for multiple provider entries while preserving CLIProxyAPI as the persistence source of truth.
 
@@ -77,7 +77,7 @@ Guardrails:
 
 ### Prompt 3: Persistence And Secret Boundary Regression
 
-Status: Pending
+Status: Complete
 
 Goal: Close the version by proving auth/provider add/delete state reloads correctly and secret boundaries still hold.
 
@@ -89,12 +89,28 @@ Expected next change:
 4. Update root docs and active version todo with the completed version state.
 5. Verify with `bun run test`, `bun run typecheck`, and `bun run build`.
 
+### Post-Completion Addendum: Output Port Smoke Tests
+
+Status: Complete
+
+Goal: Let the user verify the final CLIProxyAPI output port from Settings without broadening allmone into proxying or provider protocol logic.
+
+Expected change:
+
+1. Add focused tests for TCP connectivity probing against the configured service origin.
+2. Add focused tests for a one-shot OpenAI-compatible `/v1/chat/completions` model output request.
+3. Route both tests through main-process IPC so local client API keys remain transient.
+4. Render output port and model test results in Settings.
+5. Keep local client API keys out of renderer durable storage.
+6. Verify with focused tests, typecheck, full tests, and build.
+
 ## Completion Checklist
 
 - [x] Realtime Codex device login IPC.
-- [ ] Multi auth-file management surface.
-- [ ] Multi provider persistent add/delete surface.
-- [ ] Persistence and secret-boundary regression coverage.
+- [x] Multi auth-file management surface.
+- [x] Multi provider persistent add/delete surface.
+- [x] Persistence and secret-boundary regression coverage.
+- [x] Settings output port connectivity and model output tests.
 - [x] Root docs updated for v0.2.0 progress.
 - [x] `bun run test`.
 - [x] `bun run typecheck`.

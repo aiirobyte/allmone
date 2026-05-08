@@ -10,10 +10,10 @@ Project-level planning references:
 
 ## Active Version
 
-Active version: `0.2.0` in progress
+Active version: `0.3.0` planning setup
 
-- Previous version: `docs/version/0.1.6/`
-- Active version docs: `docs/version/0.2.0/`
+- Previous version: `docs/version/0.2.0/`
+- Active version docs: `docs/version/0.3.0/` not created yet
 
 ## Product Intent
 
@@ -34,7 +34,7 @@ If a feature would require allmone to parse provider protocols, route API traffi
 - `0.1.4`: Managed CLIProxyAPI runtime, software config, and tray MVP. Complete.
 - `0.1.5`: Real local proxy setup and full CLIProxyAPI upstream catalog. Complete.
 - `0.1.6`: React renderer and sidebar navigation. Complete.
-- `0.2.0`: Auth management surface for multiple persisted auth files and providers. In progress.
+- `0.2.0`: Auth management surface for multiple persisted auth files and providers. Complete.
 - `0.3.0`: Model-first resource inventory. Planned.
 - `0.4.0`: Usage and logs. Planned.
 - `0.5.0`: Local network sharing. Planned.

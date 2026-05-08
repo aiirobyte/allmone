@@ -10,14 +10,14 @@ Read CLAUDE.md and docs/todo.md, then continue with the active version's next un
 
 ## Active Version
 
-Active version: `0.2.0` in progress
+Active version: `0.3.0` planning setup
 
-- Previous version: `docs/version/0.1.6/`
-- Active version docs: `docs/version/0.2.0/`
+- Previous version: `docs/version/0.2.0/`
+- Active version docs: `docs/version/0.3.0/` not created yet
 
 ## Current Target
 
-Target: v0.2.0 Auth Management Surface for multiple persisted auth files and providers.
+Target: v0.3.0 Model Resource Inventory planning setup.
 
 Definition of done:
 
@@ -57,19 +57,26 @@ Definition of done:
 - [x] Create `docs/version/0.2.0/prompt_plan.md`.
 - [x] Create `docs/version/0.2.0/todo.md`.
 - [x] Add realtime Codex device login IPC and renderer display.
-- [ ] Show multiple auth-file summaries grouped by provider.
-- [ ] Add auth files through supported CLIProxyAPI login/import/management actions.
-- [ ] Delete individual auth files through CLIProxyAPI Management API.
-- [ ] Add and delete multiple provider entries through CLIProxyAPI-backed main-process services.
-- [ ] Prove persisted auth/provider state reloads correctly after refresh/startup.
+- [x] Show multiple auth-file summaries grouped by provider.
+- [x] Add auth files through supported CLIProxyAPI login/import/management actions.
+- [x] Delete individual auth files through CLIProxyAPI Management API.
+- [x] Add and delete multiple provider entries through CLIProxyAPI-backed main-process services.
+- [x] Refresh auth-file and provider summaries after add/delete operations.
+- [x] Prove persisted auth/provider state reloads correctly after refresh/startup.
+- [x] Keep token contents out of renderer state, logs, and durable storage.
+- [x] Keep allmone free of API proxying, provider adapters, routing, payload rules, and request/response transformation.
+- [x] Add Settings-side CLIProxyAPI output port connectivity and model output tests.
+- [ ] Create `docs/version/0.3.0/spec.md`.
+- [ ] Create `docs/version/0.3.0/prompt_plan.md`.
+- [ ] Create `docs/version/0.3.0/todo.md`.
 
 ## Next Prompt
 
-Continue v0.2.0 Prompt 1: Multi Auth File Management Surface.
+Start v0.3.0 Prompt 0: Model Resource Inventory planning files.
 
 Expected next change:
 
-- Show multiple auth-file summaries grouped by provider, add auth through supported handoffs, delete individual auth files, and refresh summaries without exposing token contents.
+- Create `docs/version/0.3.0/` planning files for model-first resource inventory around CLIProxyAPI-backed summaries.
 
 ## Version Roadmap
 
@@ -80,7 +87,7 @@ Expected next change:
 - [x] v0.1.4 Managed CLIProxyAPI Runtime, Software Config, And Tray MVP: YAML config, official download/update, process control, port ownership, tray status, and quick actions.
 - [x] v0.1.5 Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog: configure local client keys and every current CLIProxyAPI upstream family.
 - [x] v0.1.6 React Renderer And Sidebar Navigation: migrate renderer to React, add Providers/Settings sidebar, and remove duplicate OpenAI-compatible provider surface.
-- [ ] v0.2.0 Auth Management Surface: multiple persisted auth files and providers through CLIProxyAPI.
+- [x] v0.2.0 Auth Management Surface: multiple persisted auth files and providers through CLIProxyAPI.
 - [ ] v0.3.0 Model Resource Inventory: model-first inventory with backing provider/auth details.
 - [ ] v0.4.0 Usage And Logs: request log, usage, queue, and error visibility.
 - [ ] v0.5.0 Local Network Sharing: safe localhost/public-interface controls through CLIProxyAPI.
@@ -116,4 +123,7 @@ Expected next change:
 - 2026-05-09: v0.1.6 completed. Migrated renderer to React, split app state/types/shared UI/Providers/Settings surfaces, added sidebar navigation, removed the duplicate standalone OpenAI-compatible provider module, preserved main-process IPC contracts, and verified with `bun run test`, `bun run typecheck`, and `bun run build`.
 - 2026-05-09: v0.2.0 Prompt 0 implemented realtime Codex device login IPC. CLIProxyAPI login stdout/stderr are piped, redacted, parsed for Codex device URL/code, forwarded to the invoking renderer, and shown in a transient Provider Login panel in Providers. Verified with `bun run test`, `bun run typecheck`, and `bun run build`.
 - 2026-05-09: v0.2.0 planning recentered on multiple persisted auth files and providers with add/delete management; broad auth metadata editing is deferred unless required for add/delete.
+- 2026-05-09: v0.2.0 Prompt 1 completed. Providers now groups multiple account auth-file summaries by provider, shows safe metadata only, reuses login/import add handoffs, deletes individual auth files through main-process IPC/CLIProxyAPI Management API, and refreshes upstream/auth summaries after add/delete.
+- 2026-05-09: v0.2.0 completed. Provider entries now render with safe metadata and delete actions, add/delete flows refresh from CLIProxyAPI-backed state, reload/startup regressions prove persisted summaries are reread, and renderer durable-storage tests prevent auth/login data from entering `localStorage` or `sessionStorage`. Verified with focused red/green tests, `bun run test`, `bun run typecheck`, and `bun run build`.
+- 2026-05-09: Added Settings output port tests after v0.2.0 completion: TCP connectivity against the final CLIProxyAPI service port plus a transient local-key `/v1/chat/completions` model output smoke test. allmone still does not proxy, adapt, or transform provider traffic.
 - Update this file and the active version todo after every meaningful coding session.

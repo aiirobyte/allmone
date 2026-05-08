@@ -1,7 +1,7 @@
 # allmone v0.2.0 Spec
 
 Last updated: 2026-05-09
-Status: In Progress
+Status: Complete
 
 ## Version Goal
 
@@ -25,6 +25,9 @@ Prompt 0 already handled the immediate Codex device-login need: when CLIProxyAPI
 - Support deleting individual auth files through CLIProxyAPI Management API with an explicit user action.
 - Support adding and deleting multiple provider entries through CLIProxyAPI-backed main-process services.
 - Refresh auth-file and provider summaries after add/delete operations so persisted state is visible immediately.
+- Support Settings-side CLIProxyAPI output-port diagnostics:
+  - TCP connectivity test against the final local service origin and port.
+  - One-shot OpenAI-compatible `/v1/chat/completions` model output test with a transient local client API key.
 - Forward provider-login runtime events from the managed CLIProxyAPI child process to the invoking renderer.
 - Display Codex device login URL, one-time code, and redacted command output while `--codex-device-login` is running.
 - Keep login output transient in React state only.
@@ -93,6 +96,7 @@ Focused tests should cover:
 - Auth-file add/delete flows refreshing summaries after the write.
 - Provider add/delete flows preserving unrelated providers.
 - Main-process validation and redaction for auth/provider write failures.
+- Output port connectivity and model output tests with fake connector/fetch adapters.
 
 ## Acceptance
 
@@ -105,6 +109,8 @@ Focused tests should cover:
 - Users can add supported auth resources through login/import/management actions.
 - Users can delete individual auth files.
 - Users can add and delete supported provider entries without losing unrelated entries.
+- Users can test whether the final CLIProxyAPI output port is reachable.
+- Users can run a one-shot model output test through `/v1/chat/completions`.
 - Auth/provider add/delete changes persist through CLIProxyAPI-managed configuration or the allmone-managed runtime auth directory and remain visible after refresh.
 - Existing provider login handoff behavior remains intact.
 - `bun run test`, `bun run typecheck`, and `bun run build` pass.
