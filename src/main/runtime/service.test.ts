@@ -6,6 +6,10 @@ import type {
   AllmoneSoftwareConfig
 } from './allmoneConfigStore'
 import type { CliProxyApiConfigWriter } from './cliproxyapiConfigWriter'
+import type {
+  CliProxyApiProcessController,
+  CliProxyApiProcessState
+} from './cliproxyapiProcessController'
 import {
   createRuntimeService,
   type RuntimeCliProxyApiClient,
@@ -35,6 +39,9 @@ function createFakeStore(initial: RuntimeLoadedSettings): RuntimeSettingsStore &
   return {
     nextSaved: undefined,
     async load() {
+      return initial
+    },
+    async ensureManagementKey() {
       return initial
     },
     async saveConnectionSettings() {
@@ -90,6 +97,51 @@ function createFakeAllmoneConfigStore(
     },
     async save() {
       return config
+    }
+  }
+}
+
+function createFakeProcessController(
+  initial: CliProxyApiProcessState = { status: 'stopped' }
+): CliProxyApiProcessController & { calls: string[] } {
+  let state = initial
+
+  return {
+    calls: [],
+    getState() {
+      return state
+    },
+    async start() {
+      this.calls.push('start')
+      state = { status: 'running', pid: 1234 }
+      return state
+    },
+    async stop() {
+      this.calls.push('stop')
+      state = { status: 'stopped' }
+      return state
+    },
+    async restart() {
+      this.calls.push('restart')
+      state = { status: 'running', pid: 2345 }
+      return state
+    },
+    async checkForUpdate() {
+      this.calls.push('checkForUpdate')
+      state = {
+        status: 'ready',
+        install: { status: 'up_to_date', version: 'v6.9.0' }
+      }
+      return state
+    },
+    async ensureInstalledThenStart() {
+      this.calls.push('ensureInstalledThenStart')
+      state = {
+        status: 'running',
+        pid: 3456,
+        install: { status: 'existing', version: 'v6.9.0' }
+      }
+      return state
     }
   }
 }
@@ -256,10 +308,19 @@ test('derives the management base URL from managed software config', async () =>
     service.getState().connection.baseUrl,
     'http://127.0.0.1:9444/v0/management'
   )
+  assert.equal(
+    service.getState().software?.runtime.apiBaseUrl,
+    'http://127.0.0.1:9444/v1'
+  )
+  assert.equal(
+    service.getState().software?.cliproxyapi.localExecutablePath,
+    '/tmp/allmone/runtime/bin/cli-proxy-api'
+  )
 })
 
-test('saves managed output ports and rebuilds the runtime client', async () => {
+test('saves managed output ports, rebuilds the runtime client, and restarts managed processes', async () => {
   const store = createFakeStore(loadedSettings())
+  const processController = createFakeProcessController({ status: 'running' })
   const seenOptions: Array<{
     baseUrl?: string
     managementKey?: string
@@ -281,6 +342,7 @@ test('saves managed output ports and rebuilds the runtime client', async () => {
     settingsStore: store,
     allmoneConfigStore: createFakeAllmoneConfigStore(managedSoftwareConfig(8317)),
     cliProxyApiConfigWriter: configWriter,
+    cliProxyApiProcessController: processController,
     createClient
   })
 
@@ -293,6 +355,34 @@ test('saves managed output ports and rebuilds the runtime client', async () => {
     managementKey: 'mgmt-secret',
     timeoutMs: 5000
   })
+  assert.deepEqual(processController.calls, ['restart'])
+})
+
+test('routes managed process commands through the process controller', async () => {
+  const store = createFakeStore(loadedSettings())
+  const processController = createFakeProcessController()
+  const service = createRuntimeService({
+    settingsStore: store,
+    allmoneConfigStore: createFakeAllmoneConfigStore(managedSoftwareConfig(8317)),
+    cliProxyApiProcessController: processController
+  })
+
+  await service.initialize()
+  await service.ensureInstalledThenStart()
+  await service.startManagedRuntime()
+  await service.restartManagedRuntime()
+  await service.stopManagedRuntime()
+  await service.checkForUpdate()
+
+  assert.deepEqual(processController.calls, [
+    'ensureInstalledThenStart',
+    'start',
+    'restart',
+    'stop',
+    'checkForUpdate'
+  ])
+  assert.equal(service.getState().managed?.status, 'ready')
+  assert.equal(service.getState().software?.runtime.port, 8317)
 })
 
 test('returns sanitized config summaries without provider secrets', async () => {

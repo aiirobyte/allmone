@@ -2,6 +2,22 @@ import type {
   CliProxyApiManagementState,
   CliProxyApiModelAlias
 } from '../cliproxyapi'
+import type { CliProxyApiProcessState } from './cliproxyapiProcessController'
+
+export interface RuntimeSoftwareConfigSummary {
+  cliproxyapi: {
+    releaseMetadataUrl: string
+    releasePageUrl: string
+    localExecutablePath: string
+  }
+  runtime: {
+    host: string
+    port: number
+    configPath: string
+    apiBaseUrl: string
+    managementBaseUrl: string
+  }
+}
 
 export interface RuntimeConnectionSettings {
   baseUrl: string
@@ -25,6 +41,8 @@ export interface RuntimeLoadedSettings {
 export interface RuntimeState {
   status: CliProxyApiManagementState
   connection: RuntimeConnectionSettings
+  software?: RuntimeSoftwareConfigSummary
+  managed?: CliProxyApiProcessState
   lastError?: string
   lastCheckedAt?: string
   lastHttpStatus?: number

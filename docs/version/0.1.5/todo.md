@@ -12,7 +12,7 @@ Definition of done:
 - [x] Create `docs/version/0.1.5/spec.md`.
 - [x] Create `docs/version/0.1.5/prompt_plan.md`.
 - [x] Create `docs/version/0.1.5/todo.md`.
-- [ ] Finish v0.1.4 before implementation starts.
+- [x] Finish v0.1.4 before implementation starts.
 - [ ] Add upstream provider catalog for every current CLIProxyAPI upstream family.
 - [ ] Add typed Management API client support for local api-keys.
 - [ ] Add typed Management API client support for Gemini API key upstreams.

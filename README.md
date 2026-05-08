@@ -80,6 +80,6 @@ docs/
 
 ## Current Target
 
-Current roadmap target: v0.1.4 Tray MVP.
+Current roadmap target: v0.1.5 Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog.
 
 See `docs/todo.md` for the next executable prompt.

@@ -16,6 +16,7 @@ import type {
   AllmoneSoftwareConfig
 } from './allmoneConfigStore'
 import type { CliProxyApiConfigWriter } from './cliproxyapiConfigWriter'
+import type { CliProxyApiProcessController } from './cliproxyapiProcessController'
 import type { RuntimeSettingsStore } from './settingsStore'
 import type {
   RuntimeConfigSummary,
@@ -45,6 +46,7 @@ export interface RuntimeServiceOptions {
   settingsStore: RuntimeSettingsStore
   allmoneConfigStore?: AllmoneConfigStore
   cliProxyApiConfigWriter?: CliProxyApiConfigWriter
+  cliProxyApiProcessController?: CliProxyApiProcessController
   createClient?: RuntimeClientFactory
 }
 
@@ -55,6 +57,11 @@ export interface RuntimeService {
     input: RuntimeConnectionSettingsInput
   ): Promise<RuntimeState>
   saveOutputPort(port: number): Promise<RuntimeState>
+  ensureInstalledThenStart(): Promise<RuntimeState>
+  checkForUpdate(): Promise<RuntimeState>
+  startManagedRuntime(): Promise<RuntimeState>
+  restartManagedRuntime(): Promise<RuntimeState>
+  stopManagedRuntime(): Promise<RuntimeState>
   testConnection(): Promise<CliProxyApiManagementCheckResult>
   getConfigSummary(): Promise<RuntimeConfigSummary>
   upsertOpenAiCompatibilityProvider(
@@ -75,15 +82,20 @@ class DefaultRuntimeService implements RuntimeService {
   private loadedSettings: RuntimeLoadedSettings | undefined
   private client: RuntimeCliProxyApiClient | undefined
   private state: RuntimeState | undefined
+  private managedConfig: AllmoneSoftwareConfig | undefined
   private readonly settingsStore: RuntimeSettingsStore
   private readonly allmoneConfigStore: AllmoneConfigStore | undefined
   private readonly cliProxyApiConfigWriter: CliProxyApiConfigWriter | undefined
+  private readonly cliProxyApiProcessController:
+    | CliProxyApiProcessController
+    | undefined
   private readonly createClient: RuntimeClientFactory
 
   constructor(options: RuntimeServiceOptions) {
     this.settingsStore = options.settingsStore
     this.allmoneConfigStore = options.allmoneConfigStore
     this.cliProxyApiConfigWriter = options.cliProxyApiConfigWriter
+    this.cliProxyApiProcessController = options.cliProxyApiProcessController
     this.createClient = options.createClient ?? createCliProxyApiClient
   }
 
@@ -104,7 +116,10 @@ class DefaultRuntimeService implements RuntimeService {
       throw new Error('Runtime service is not initialized')
     }
 
-    return { ...state, connection: { ...state.connection } }
+    return copyRuntimeState({
+      ...state,
+      managed: this.cliProxyApiProcessController?.getState() ?? state.managed
+    })
   }
 
   async saveConnectionSettings(
@@ -133,7 +148,39 @@ class DefaultRuntimeService implements RuntimeService {
       throw new Error('Runtime service is not initialized')
     }
 
+    this.managedConfig = config
     this.applyLoadedSettings(withManagedBaseUrl(loaded, config))
+    const processState = this.cliProxyApiProcessController?.getState()
+
+    if (processState?.status === 'running') {
+      await this.cliProxyApiProcessController?.restart()
+    }
+
+    return this.getState()
+  }
+
+  async ensureInstalledThenStart(): Promise<RuntimeState> {
+    await this.getManagedProcessController().ensureInstalledThenStart()
+    return this.getState()
+  }
+
+  async checkForUpdate(): Promise<RuntimeState> {
+    await this.getManagedProcessController().checkForUpdate()
+    return this.getState()
+  }
+
+  async startManagedRuntime(): Promise<RuntimeState> {
+    await this.getManagedProcessController().start()
+    return this.getState()
+  }
+
+  async restartManagedRuntime(): Promise<RuntimeState> {
+    await this.getManagedProcessController().restart()
+    return this.getState()
+  }
+
+  async stopManagedRuntime(): Promise<RuntimeState> {
+    await this.getManagedProcessController().stop()
     return this.getState()
   }
 
@@ -215,7 +262,11 @@ class DefaultRuntimeService implements RuntimeService {
       status: loaded.connection.managementKeyConfigured
         ? 'unreachable'
         : 'auth_required',
-      connection: loaded.connection
+      connection: loaded.connection,
+      software: this.managedConfig
+        ? toSoftwareConfigSummary(this.managedConfig)
+        : this.state?.software,
+      managed: this.cliProxyApiProcessController?.getState()
     }
   }
 
@@ -223,10 +274,18 @@ class DefaultRuntimeService implements RuntimeService {
     writeRuntimeConfig?: boolean
   } = {}): Promise<AllmoneSoftwareConfig | undefined> {
     if (options.writeRuntimeConfig && this.cliProxyApiConfigWriter) {
-      return await this.cliProxyApiConfigWriter.writeManagedConfig()
+      const config = await this.cliProxyApiConfigWriter.writeManagedConfig()
+      this.applyManagedConfig(config)
+      return config
     }
 
-    return await this.allmoneConfigStore?.load()
+    const config = await this.allmoneConfigStore?.load()
+
+    if (config) {
+      this.applyManagedConfig(config)
+    }
+
+    return config
   }
 
   private getClient(): RuntimeCliProxyApiClient {
@@ -240,10 +299,59 @@ class DefaultRuntimeService implements RuntimeService {
     return client
   }
 
+  private getManagedProcessController(): CliProxyApiProcessController {
+    if (!this.cliProxyApiProcessController) {
+      throw new Error('Managed runtime process controller is not available')
+    }
+
+    return this.cliProxyApiProcessController
+  }
+
+  private applyManagedConfig(config: AllmoneSoftwareConfig): void {
+    this.managedConfig = config
+
+    if (!this.state) {
+      return
+    }
+
+    this.state = {
+      ...this.state,
+      software: toSoftwareConfigSummary(config)
+    }
+  }
+
   private ensureInitialized(): void {
     if (!this.loadedSettings || !this.client || !this.state) {
       throw new Error('Runtime service is not initialized')
     }
+  }
+}
+
+function toSoftwareConfigSummary(
+  config: AllmoneSoftwareConfig
+): RuntimeState['software'] {
+  return {
+    cliproxyapi: { ...config.cliproxyapi },
+    runtime: { ...config.runtime }
+  }
+}
+
+function copyRuntimeState(state: RuntimeState): RuntimeState {
+  return {
+    ...state,
+    connection: { ...state.connection },
+    software: state.software
+      ? {
+          cliproxyapi: { ...state.software.cliproxyapi },
+          runtime: { ...state.software.runtime }
+        }
+      : undefined,
+    managed: state.managed
+      ? {
+          ...state.managed,
+          install: state.managed.install ? { ...state.managed.install } : undefined
+        }
+      : undefined
   }
 }
 

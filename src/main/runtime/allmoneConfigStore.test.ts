@@ -131,7 +131,7 @@ test('rejects invalid release metadata URLs', async () => {
   })
 })
 
-test('deletes old userData runtime settings without migrating values', async () => {
+test('preserves userData runtime settings while keeping software config secret-free', async () => {
   await withTempRuntimeHome(async (homeDir) => {
     const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
     const oldUserDataDir = join(homeDir, 'old-user-data')
@@ -168,6 +168,12 @@ test('deletes old userData runtime settings without migrating values', async () 
       'http://127.0.0.1:8317/v0/management'
     )
     assert(!raw.includes('encrypted-secret'))
-    await assert.rejects(() => readFile(oldSettingsFilePath, 'utf8'), /ENOENT/)
+    assert.deepEqual(JSON.parse(await readFile(oldSettingsFilePath, 'utf8')), {
+      connection: {
+        baseUrl: 'http://127.0.0.1:9001/v0/management',
+        timeoutMs: 5000
+      },
+      managementKeyEncrypted: 'encrypted-secret'
+    })
   })
 })

@@ -32,7 +32,7 @@ type ConfigLoadResult = {
   error: string | null
 }
 
-type SafeEndpointKind = 'management' | 'origin'
+type SafeEndpointKind = 'management' | 'origin' | 'api'
 
 type ViewState = {
   appVersion: string
@@ -121,6 +121,8 @@ function render(): void {
 
       ${renderFeedback()}
 
+      ${renderManagedRuntimePanel()}
+
       <div class="layout">
         <section class="surface connection-surface">
           <div class="section-heading">
@@ -158,6 +160,92 @@ function renderFeedback(): string {
   }
 
   return ''
+}
+
+function renderManagedRuntimePanel(): string {
+  const runtime = state.runtimeState
+  const software = runtime?.software
+  const managed = runtime?.managed
+  const apiBaseUrl = software?.runtime.apiBaseUrl ?? ''
+  const executablePath = software?.cliproxyapi.localExecutablePath ?? ''
+  const releaseMetadataUrl = software?.cliproxyapi.releaseMetadataUrl ?? ''
+  const installVersion = managed?.install?.version ?? 'Unknown'
+  const managedStatus = managedStatusLabel(managed?.status)
+  const canStart = canStartManagedRuntime()
+  const canControlRunning = managed?.status === 'running'
+  const canCheckUpdate = !isManagedBusy()
+
+  return `
+    <section class="surface managed-surface">
+      <div class="section-heading">
+        <h2>Managed CLIProxyAPI</h2>
+        <span>${escapeHtml(managedStatus)}</span>
+      </div>
+      <div class="managed-grid">
+        <form id="managed-runtime-form" class="managed-port-form">
+          <label>
+            <span>Output Port</span>
+            <input
+              name="port"
+              type="number"
+              min="1"
+              max="65535"
+              step="1"
+              value="${software?.runtime.port ?? 8317}"
+              required
+            />
+          </label>
+          <button type="submit" ${isBusy('save-output-port')}>Save Port</button>
+        </form>
+
+        <div class="managed-actions">
+          <button type="button" data-action="install-update" ${isBusy('install-update')}>
+            Install / Retry
+          </button>
+          <button type="button" data-action="check-update" ${canCheckUpdate ? isBusy('check-update') : 'disabled'}>
+            Check Update
+          </button>
+          <button type="button" data-action="start-runtime" ${canStart ? isBusy('start-runtime') : 'disabled'}>
+            Start
+          </button>
+          <button type="button" data-action="restart-runtime" ${canControlRunning ? isBusy('restart-runtime') : 'disabled'}>
+            Restart
+          </button>
+          <button type="button" data-action="stop-runtime" ${canControlRunning ? isBusy('stop-runtime') : 'disabled'}>
+            Stop
+          </button>
+        </div>
+      </div>
+
+      <div class="managed-detail-grid">
+        <div>
+          <dt>Process</dt>
+          <dd>${escapeHtml(managedStatus)}</dd>
+        </div>
+        <div>
+          <dt>Version</dt>
+          <dd>${escapeHtml(installVersion)}</dd>
+        </div>
+        <div>
+          <dt>API Base</dt>
+          <dd><code>${escapeHtml(apiBaseUrl || 'Unavailable')}</code></dd>
+        </div>
+        <div>
+          <dt>Executable</dt>
+          <dd><code>${escapeHtml(executablePath || 'Unavailable')}</code></dd>
+        </div>
+        <div class="wide-detail">
+          <dt>Release Metadata</dt>
+          <dd><code>${escapeHtml(releaseMetadataUrl || 'Unavailable')}</code></dd>
+        </div>
+      </div>
+
+      ${managed?.lastError ? renderDiagnostic(managed.lastError) : ''}
+      <div class="copy-panel">
+        ${renderCopyRow('API Base', apiBaseUrl || null, 'api')}
+      </div>
+    </section>
+  `
 }
 
 function renderConnectionForm(): string {
@@ -470,6 +558,9 @@ function renderModelRow(model: ModelDraft, index: number): string {
 
 function bindEventHandlers(): void {
   document
+    .querySelector<HTMLFormElement>('#managed-runtime-form')
+    ?.addEventListener('submit', onManagedRuntimeSubmit)
+  document
     .querySelector<HTMLFormElement>('#connection-form')
     ?.addEventListener('submit', onConnectionSubmit)
   document
@@ -503,6 +594,26 @@ async function onConnectionSubmit(event: SubmitEvent): Promise<void> {
     state.providerDraft = emptyProviderDraft()
     state.selectedProviderName = null
     state.notice = 'Connection settings saved'
+  })
+}
+
+async function onManagedRuntimeSubmit(event: SubmitEvent): Promise<void> {
+  event.preventDefault()
+  const form = event.currentTarget
+
+  if (!(form instanceof HTMLFormElement)) {
+    return
+  }
+
+  const data = new FormData(form)
+
+  await runAction('save-output-port', async () => {
+    state.runtimeState = await window.allmone.runtime.saveOutputPort(
+      Number(data.get('port'))
+    )
+    state.configSummary = null
+    state.configLoadError = null
+    state.notice = 'Output port saved'
   })
 }
 
@@ -558,6 +669,41 @@ function onActionClick(event: Event): void {
     case 'refresh-config':
       void refreshConfig()
       break
+    case 'install-update':
+      void managedCommand(
+        'install-update',
+        () => window.allmone.runtime.ensureInstalledThenStart(),
+        'Install/start requested'
+      )
+      break
+    case 'check-update':
+      void managedCommand(
+        'check-update',
+        () => window.allmone.runtime.checkForUpdate(),
+        'Update check finished'
+      )
+      break
+    case 'start-runtime':
+      void managedCommand(
+        'start-runtime',
+        () => window.allmone.runtime.startManagedRuntime(),
+        'Runtime started'
+      )
+      break
+    case 'restart-runtime':
+      void managedCommand(
+        'restart-runtime',
+        () => window.allmone.runtime.restartManagedRuntime(),
+        'Runtime restarted'
+      )
+      break
+    case 'stop-runtime':
+      void managedCommand(
+        'stop-runtime',
+        () => window.allmone.runtime.stopManagedRuntime(),
+        'Runtime stopped'
+      )
+      break
     case 'copy-endpoint':
       void copyEndpoint(target.dataset.copyKind)
       break
@@ -586,6 +732,17 @@ function onActionClick(event: Event): void {
       render()
       break
   }
+}
+
+async function managedCommand(
+  action: string,
+  command: () => Promise<RuntimeState>,
+  notice: string
+): Promise<void> {
+  await runAction(action, async () => {
+    state.runtimeState = await command()
+    state.notice = notice
+  })
 }
 
 async function testConnection(): Promise<void> {
@@ -628,11 +785,17 @@ async function refreshConfig(): Promise<void> {
 }
 
 async function copyEndpoint(kind: string | undefined): Promise<void> {
-  if (kind !== 'management' && kind !== 'origin') {
+  if (kind !== 'management' && kind !== 'origin' && kind !== 'api') {
     return
   }
 
   await runAction(`copy:${kind}`, async () => {
+    if (kind === 'api') {
+      const result = await window.allmone.runtime.copyApiBase()
+      state.notice = `Copied ${result.value}`
+      return
+    }
+
     const value = getSafeEndpoint(kind)
 
     if (!value) {
@@ -795,6 +958,31 @@ function statusLabel(status: RuntimeState['status'] | undefined): string {
   }
 }
 
+function managedStatusLabel(status: string | undefined): string {
+  switch (status) {
+    case 'installing':
+      return 'Installing'
+    case 'ready':
+      return 'Ready'
+    case 'starting':
+      return 'Starting'
+    case 'running':
+      return 'Running'
+    case 'stopping':
+      return 'Stopping'
+    case 'stopped':
+      return 'Stopped'
+    case 'crashed':
+      return 'Crashed'
+    case 'update_failed':
+      return 'Update Failed'
+    case 'launch_failed':
+      return 'Launch Failed'
+    default:
+      return 'Missing'
+  }
+}
+
 function nextActionForStatus(status: RuntimeState['status'] | undefined): string {
   switch (status) {
     case 'reachable':
@@ -835,6 +1023,18 @@ function statusClass(status: RuntimeState['status'] | undefined): string {
 
 function isRuntimeReachable(): boolean {
   return state.runtimeState?.status === 'reachable'
+}
+
+function isManagedBusy(): boolean {
+  const status = state.runtimeState?.managed?.status
+
+  return status === 'installing' || status === 'starting' || status === 'stopping'
+}
+
+function canStartManagedRuntime(): boolean {
+  const status = state.runtimeState?.managed?.status
+
+  return !isManagedBusy() && status !== 'running'
 }
 
 function getSafeEndpoint(kind: SafeEndpointKind): string | null {

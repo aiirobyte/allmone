@@ -1,4 +1,4 @@
-import { readFile, rm, writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { parse, stringify } from 'yaml'
 
@@ -37,6 +37,7 @@ export interface AllmoneSoftwareConfigInput {
 
 export interface AllmoneConfigStoreOptions {
   runtimeHome: RuntimeHomePaths
+  // Deprecated no-op: runtime-settings.json still owns management key storage.
   oldSettingsFilePath?: string
 }
 
@@ -53,16 +54,13 @@ export function createAllmoneConfigStore(
 
 class FileAllmoneConfigStore implements AllmoneConfigStore {
   private readonly runtimeHome: RuntimeHomePaths
-  private readonly oldSettingsFilePath: string | undefined
 
   constructor(options: AllmoneConfigStoreOptions) {
     this.runtimeHome = options.runtimeHome
-    this.oldSettingsFilePath = options.oldSettingsFilePath
   }
 
   async load(): Promise<AllmoneSoftwareConfig> {
     await ensureRuntimeHome(this.runtimeHome)
-    await this.deleteOldSettingsFile()
 
     const raw = await this.readConfigFile()
     const config =
@@ -118,14 +116,6 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
         configPath: this.runtimeHome.runtimeConfigPath
       }
     })
-  }
-
-  private async deleteOldSettingsFile(): Promise<void> {
-    if (!this.oldSettingsFilePath) {
-      return
-    }
-
-    await rm(this.oldSettingsFilePath, { force: true })
   }
 
   private normalizeConfig(value: unknown): AllmoneSoftwareConfig {

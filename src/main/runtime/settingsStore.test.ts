@@ -70,9 +70,11 @@ test('loads default connection settings on first launch', async () => {
 
 test('saves non-secret settings without writing a plaintext management key', async () => {
   await withTempStore(async (userDataPath) => {
+    const filePath = join(userDataPath, '.allmone', 'runtime', 'runtime-settings.json')
     const store = createRuntimeSettingsStore({
       app: createFakeApp(userDataPath),
-      safeStorage: createSafeStorage()
+      safeStorage: createSafeStorage(),
+      filePath
     })
 
     const saved = await store.saveConnectionSettings({
@@ -81,7 +83,7 @@ test('saves non-secret settings without writing a plaintext management key', asy
       managementKey: 'mgmt-super-secret'
     })
 
-    const raw = await readFile(join(userDataPath, 'runtime-settings.json'), 'utf8')
+    const raw = await readFile(filePath, 'utf8')
     assert.equal(saved.connection.baseUrl, 'http://localhost:9000/v0/management')
     assert.equal(saved.connection.timeoutMs, 3000)
     assert.equal(saved.connection.managementKeyConfigured, true)
@@ -89,6 +91,43 @@ test('saves non-secret settings without writing a plaintext management key', asy
     assert.equal(saved.managementKey, 'mgmt-super-secret')
     assert(!raw.includes('mgmt-super-secret'))
     assert(raw.includes('managementKeyEncrypted'))
+  })
+})
+
+test('migrates old userData runtime settings into managed runtime home and deletes the old file', async () => {
+  await withTempStore(async (userDataPath) => {
+    const oldFilePath = join(userDataPath, 'runtime-settings.json')
+    const filePath = join(userDataPath, '.allmone', 'runtime', 'runtime-settings.json')
+
+    await writeFile(
+      oldFilePath,
+      JSON.stringify({
+        connection: {
+          baseUrl: 'http://localhost:9000/v0/management',
+          timeoutMs: 3000
+        },
+        managementKeyEncrypted: Buffer.from('enc:migrated-management-key')
+          .toString('base64')
+      })
+    )
+
+    const store = createRuntimeSettingsStore({
+      app: createFakeApp(userDataPath),
+      safeStorage: createSafeStorage(),
+      filePath,
+      oldSettingsFilePath: oldFilePath
+    })
+
+    const loaded = await store.load()
+    const raw = await readFile(filePath, 'utf8')
+
+    assert.equal(loaded.connection.baseUrl, 'http://localhost:9000/v0/management')
+    assert.equal(loaded.connection.managementKeyConfigured, true)
+    assert.equal(loaded.connection.managementKeyPersisted, true)
+    assert.equal(loaded.managementKey, 'migrated-management-key')
+    assert(raw.includes('managementKeyEncrypted'))
+    assert(!raw.includes('migrated-management-key'))
+    await assert.rejects(() => readFile(oldFilePath, 'utf8'), /ENOENT/)
   })
 })
 
@@ -110,6 +149,27 @@ test('keeps management keys in memory when safe storage is unavailable', async (
     assert.equal(loadedAgain.managementKey, 'session-only-key')
     assert(!raw.includes('session-only-key'))
     assert(!raw.includes('managementKeyEncrypted'))
+  })
+})
+
+test('generates a management key without writing it in plaintext', async () => {
+  await withTempStore(async (userDataPath) => {
+    const store = createRuntimeSettingsStore({
+      app: createFakeApp(userDataPath),
+      safeStorage: createSafeStorage(),
+      generateManagementKey: () => 'generated-management-key'
+    })
+
+    const generated = await store.ensureManagementKey()
+    const loadedAgain = await store.ensureManagementKey()
+    const raw = await readFile(join(userDataPath, 'runtime-settings.json'), 'utf8')
+
+    assert.equal(generated.managementKey, 'generated-management-key')
+    assert.equal(generated.connection.managementKeyConfigured, true)
+    assert.equal(generated.connection.managementKeyPersisted, true)
+    assert.equal(loadedAgain.managementKey, 'generated-management-key')
+    assert(!raw.includes('generated-management-key'))
+    assert(raw.includes('managementKeyEncrypted'))
   })
 })
 

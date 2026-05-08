@@ -1,25 +1,25 @@
 # allmone Current Prompt Plan
 
-Last updated: 2026-05-07
+Last updated: 2026-05-08
 
 Specific version prompt plans live under `docs/version/<semver>/prompt_plan.md`.
 
 ## Active Version
 
-Implement v0.1.4 from the version prompt plan:
+Implement v0.1.5 from the version prompt plan:
 
 ```text
 Read CLAUDE.md.
 Read docs/todo.md.
-Read docs/version/0.1.4/spec.md.
-Read docs/version/0.1.4/prompt_plan.md.
-Continue from the next unchecked item in docs/version/0.1.4/todo.md.
+Read docs/version/0.1.5/spec.md.
+Read docs/version/0.1.5/prompt_plan.md.
+Continue from the next unchecked item in docs/version/0.1.5/todo.md.
 Preserve user changes and keep secrets out of renderer storage.
 ```
 
 Current next prompt:
 
-- Start v0.1.4 Prompt 3: Process Launch, Restart, And Shutdown.
+- Start v0.1.5 Prompt 0: Upstream Catalog And Types.
 
 ## Operating Rule
 

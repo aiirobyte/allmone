@@ -12,6 +12,7 @@ export interface RuntimeHomePaths {
   runtimeLogsDir: string
   runtimeTmpDir: string
   runtimeConfigPath: string
+  runtimeSettingsPath: string
   installMetadataPath: string
   cliProxyApiExecutablePath: string
 }
@@ -42,6 +43,7 @@ export function resolveRuntimeHome(
     runtimeLogsDir: join(runtimeDir, 'logs'),
     runtimeTmpDir: join(runtimeDir, 'tmp'),
     runtimeConfigPath: join(runtimeDir, 'config.yaml'),
+    runtimeSettingsPath: join(runtimeDir, 'runtime-settings.json'),
     installMetadataPath: join(runtimeDir, 'install.json'),
     cliProxyApiExecutablePath: join(runtimeBinDir, executableName)
   }

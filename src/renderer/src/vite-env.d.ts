@@ -19,6 +19,13 @@ interface AllmoneRuntimeApi {
   ) => Promise<RuntimeState>
   testConnection: () => Promise<CliProxyApiManagementCheckResult>
   getConfigSummary: () => Promise<RuntimeConfigSummary>
+  saveOutputPort: (port: number) => Promise<RuntimeState>
+  ensureInstalledThenStart: () => Promise<RuntimeState>
+  checkForUpdate: () => Promise<RuntimeState>
+  startManagedRuntime: () => Promise<RuntimeState>
+  restartManagedRuntime: () => Promise<RuntimeState>
+  stopManagedRuntime: () => Promise<RuntimeState>
+  copyApiBase: () => Promise<{ value: string }>
   upsertOpenAiCompatibilityProvider: (
     input: RuntimeOpenAiProviderInput
   ) => Promise<RuntimeProviderWriteResult>

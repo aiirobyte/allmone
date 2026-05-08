@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { randomBytes } from 'node:crypto'
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 
 import { CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL } from '../cliproxyapi'
 import type {
@@ -24,6 +25,9 @@ export interface RuntimeSafeStorageAdapter {
 interface RuntimeSettingsStoreOptions {
   app: RuntimeAppAdapter
   safeStorage: RuntimeSafeStorageAdapter
+  filePath?: string
+  oldSettingsFilePath?: string
+  generateManagementKey?: () => string
 }
 
 interface PersistedRuntimeSettings {
@@ -36,6 +40,7 @@ interface PersistedRuntimeSettings {
 
 export interface RuntimeSettingsStore {
   load(): Promise<RuntimeLoadedSettings>
+  ensureManagementKey(): Promise<RuntimeLoadedSettings>
   saveConnectionSettings(
     input: RuntimeConnectionSettingsInput
   ): Promise<RuntimeLoadedSettings>
@@ -49,12 +54,18 @@ export function createRuntimeSettingsStore(
 
 class FileRuntimeSettingsStore implements RuntimeSettingsStore {
   private readonly filePath: string
+  private readonly oldSettingsFilePath: string | undefined
   private readonly safeStorage: RuntimeSafeStorageAdapter
+  private readonly generateManagementKey: () => string
   private memoryManagementKey: string | undefined
 
   constructor(options: RuntimeSettingsStoreOptions) {
-    this.filePath = join(options.app.getPath('userData'), SETTINGS_FILE_NAME)
+    this.filePath =
+      options.filePath ?? join(options.app.getPath('userData'), SETTINGS_FILE_NAME)
+    this.oldSettingsFilePath = options.oldSettingsFilePath
     this.safeStorage = options.safeStorage
+    this.generateManagementKey =
+      options.generateManagementKey ?? defaultGenerateManagementKey
   }
 
   async load(): Promise<RuntimeLoadedSettings> {
@@ -135,7 +146,21 @@ class FileRuntimeSettingsStore implements RuntimeSettingsStore {
     }
   }
 
+  async ensureManagementKey(): Promise<RuntimeLoadedSettings> {
+    const current = await this.load()
+
+    if (current.managementKey) {
+      return current
+    }
+
+    return await this.saveConnectionSettings({
+      managementKey: this.generateManagementKey()
+    })
+  }
+
   private async readPersistedSettings(): Promise<PersistedRuntimeSettings> {
+    await this.migrateOldSettingsFile()
+
     try {
       const raw = await readFile(this.filePath, 'utf8')
       const parsed = JSON.parse(raw) as PersistedRuntimeSettings
@@ -153,8 +178,30 @@ class FileRuntimeSettingsStore implements RuntimeSettingsStore {
   private async writePersistedSettings(
     settings: PersistedRuntimeSettings
   ): Promise<void> {
-    await mkdir(join(this.filePath, '..'), { recursive: true })
+    await mkdir(dirname(this.filePath), { recursive: true })
     await writeFile(this.filePath, `${JSON.stringify(settings, null, 2)}\n`)
+  }
+
+  private async migrateOldSettingsFile(): Promise<void> {
+    const oldSettingsFilePath = this.oldSettingsFilePath
+
+    if (!oldSettingsFilePath || oldSettingsFilePath === this.filePath) {
+      return
+    }
+
+    if (!(await fileExists(oldSettingsFilePath))) {
+      return
+    }
+
+    await mkdir(dirname(this.filePath), { recursive: true })
+
+    if (await fileExists(this.filePath)) {
+      await rm(oldSettingsFilePath, { force: true })
+      return
+    }
+
+    await copyFile(oldSettingsFilePath, this.filePath)
+    await rm(oldSettingsFilePath, { force: true })
   }
 
   private decryptManagementKey(encrypted: string | undefined): string | undefined {
@@ -198,6 +245,10 @@ function normalizeTimeoutMs(value: number | undefined): number {
   return Math.round(value)
 }
 
+function defaultGenerateManagementKey(): string {
+  return `allmone-mgmt-${randomBytes(32).toString('base64url')}`
+}
+
 function isMissingFileError(error: unknown): boolean {
   return (
     typeof error === 'object' &&
@@ -205,4 +256,17 @@ function isMissingFileError(error: unknown): boolean {
     'code' in error &&
     error.code === 'ENOENT'
   )
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await readFile(path)
+    return true
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return false
+    }
+
+    throw error
+  }
 }

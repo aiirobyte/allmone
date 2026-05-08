@@ -33,13 +33,17 @@ function createFakeIpcMain() {
 
 function createFakeService(): RuntimeService & {
   savedPayloads: unknown[]
+  savedPorts: unknown[]
   providerPayloads: unknown[]
   deletePayloads: unknown[]
+  commandCalls: string[]
 } {
   return {
     savedPayloads: [],
+    savedPorts: [],
     providerPayloads: [],
     deletePayloads: [],
+    commandCalls: [],
     async initialize() {},
     getState() {
       return {
@@ -49,6 +53,26 @@ function createFakeService(): RuntimeService & {
           timeoutMs: 5000,
           managementKeyConfigured: false,
           managementKeyPersisted: false
+        },
+        software: {
+          cliproxyapi: {
+            releaseMetadataUrl:
+              'https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest',
+            releasePageUrl:
+              'https://github.com/router-for-me/CLIProxyAPI/releases/latest',
+            localExecutablePath: '/tmp/allmone/runtime/bin/cli-proxy-api'
+          },
+          runtime: {
+            host: '127.0.0.1',
+            port: 8317,
+            configPath: '/tmp/allmone/runtime/config.yaml',
+            apiBaseUrl: 'http://127.0.0.1:8317/v1',
+            managementBaseUrl: 'http://127.0.0.1:8317/v0/management'
+          }
+        },
+        managed: {
+          status: 'running',
+          pid: 1234
         }
       }
     },
@@ -57,6 +81,27 @@ function createFakeService(): RuntimeService & {
       return this.getState()
     },
     async saveOutputPort() {
+      this.savedPorts.push(arguments[0])
+      return this.getState()
+    },
+    async ensureInstalledThenStart() {
+      this.commandCalls.push('ensureInstalledThenStart')
+      return this.getState()
+    },
+    async checkForUpdate() {
+      this.commandCalls.push('checkForUpdate')
+      return this.getState()
+    },
+    async startManagedRuntime() {
+      this.commandCalls.push('startManagedRuntime')
+      return this.getState()
+    },
+    async restartManagedRuntime() {
+      this.commandCalls.push('restartManagedRuntime')
+      return this.getState()
+    },
+    async stopManagedRuntime() {
+      this.commandCalls.push('stopManagedRuntime')
       return this.getState()
     },
     async testConnection() {
@@ -89,6 +134,17 @@ function createFakeService(): RuntimeService & {
           openAiCompatibilityProviders: []
         }
       }
+    }
+  }
+}
+
+function createFakeClipboard() {
+  const writes: string[] = []
+
+  return {
+    writes,
+    writeText(value: string) {
+      writes.push(value)
     }
   }
 }
@@ -168,4 +224,51 @@ test('validates provider upsert and delete payloads before calling service', asy
 
   assert.equal(service.providerPayloads.length, 1)
   assert.equal(service.deletePayloads.length, 1)
+})
+
+test('validates managed runtime port and command IPC payloads', async () => {
+  const ipc = createFakeIpcMain()
+  const service = createFakeService()
+  registerRuntimeIpcHandlers({ ipcMain: ipc.ipcMain, runtimeService: service })
+
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.saveOutputPort, { port: 9444 })
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.ensureInstalledThenStart)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.checkForUpdate)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.startManagedRuntime)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.restartManagedRuntime)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.stopManagedRuntime)
+
+  await assert.rejects(async () => {
+    await ipc.invoke(RUNTIME_IPC_CHANNELS.saveOutputPort, { port: 70_000 })
+  })
+  await assert.rejects(async () => {
+    await ipc.invoke(RUNTIME_IPC_CHANNELS.startManagedRuntime, {
+      managementKey: 'mgmt-secret'
+    })
+  })
+
+  assert.deepEqual(service.savedPorts, [9444])
+  assert.deepEqual(service.commandCalls, [
+    'ensureInstalledThenStart',
+    'checkForUpdate',
+    'startManagedRuntime',
+    'restartManagedRuntime',
+    'stopManagedRuntime'
+  ])
+})
+
+test('copies only the safe OpenAI-compatible API base through main clipboard', async () => {
+  const ipc = createFakeIpcMain()
+  const service = createFakeService()
+  const clipboard = createFakeClipboard()
+  registerRuntimeIpcHandlers({
+    ipcMain: ipc.ipcMain,
+    runtimeService: service,
+    clipboard
+  })
+
+  const result = await ipc.invoke(RUNTIME_IPC_CHANNELS.copyApiBase)
+
+  assert.deepEqual(clipboard.writes, ['http://127.0.0.1:8317/v1'])
+  assert.deepEqual(result, { value: 'http://127.0.0.1:8317/v1' })
 })

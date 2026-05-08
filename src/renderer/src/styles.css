@@ -187,8 +187,15 @@ h3 {
 }
 
 .connection-surface,
-.provider-surface {
+.provider-surface,
+.managed-surface {
   padding: 16px;
+}
+
+.managed-surface {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .section-heading {
@@ -266,6 +273,63 @@ label {
 .button-row button {
   min-width: 104px;
   padding: 0 14px;
+}
+
+.managed-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.managed-port-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 8px;
+  align-items: end;
+}
+
+.managed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.managed-actions button {
+  min-width: 84px;
+  padding: 0 12px;
+}
+
+.managed-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.managed-detail-grid div {
+  min-width: 0;
+  border: 1px solid #e0e6ee;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.managed-detail-grid .wide-detail {
+  grid-column: 1 / -1;
+}
+
+.managed-detail-grid dt {
+  color: #6b7280;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.managed-detail-grid dd {
+  margin: 4px 0 0;
+  color: #111827;
+  font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 .status-grid {
@@ -510,8 +574,17 @@ code {
 
 @media (max-width: 980px) {
   .layout,
-  .provider-grid {
+  .provider-grid,
+  .managed-grid {
     grid-template-columns: 1fr;
+  }
+
+  .managed-actions {
+    justify-content: flex-start;
+  }
+
+  .managed-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -535,7 +608,9 @@ code {
   .form-grid,
   .status-grid,
   .copy-row,
-  .model-row {
+  .model-row,
+  .managed-port-form,
+  .managed-detail-grid {
     grid-template-columns: 1fr;
   }
 

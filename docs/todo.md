@@ -10,14 +10,14 @@ Read CLAUDE.md and docs/todo.md, then continue with the active version's next un
 
 ## Active Version
 
-Active version: `0.1.4` planned
+Active version: `0.1.5` planned
 
-- Previous version: `docs/version/0.1.3/`
-- Active version docs: `docs/version/0.1.4/`
+- Previous version: `docs/version/0.1.4/`
+- Active version docs: `docs/version/0.1.5/`
 
 ## Current Target
 
-Target: v0.1.4 Managed CLIProxyAPI Runtime, Software Config, And Tray MVP.
+Target: v0.1.5 Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog.
 
 Definition of done:
 
@@ -35,14 +35,20 @@ Definition of done:
 - [x] Create and use `~/.allmone` for managed runtime files.
 - [x] Store non-secret software configuration in `~/.allmone/config.yaml`.
 - [x] Store CLIProxyAPI download address and local executable path in software configuration.
+- [x] Launch, restart, and shutdown the allmone-managed CLIProxyAPI process.
+- [x] Complete v0.1.4 managed runtime, tray, renderer controls, and build verification.
+- [x] Create `docs/version/0.1.5/spec.md`.
+- [x] Create `docs/version/0.1.5/prompt_plan.md`.
+- [x] Create `docs/version/0.1.5/todo.md`.
+- [ ] Add upstream provider catalog for every current CLIProxyAPI upstream family.
 
 ## Next Prompt
 
-Start v0.1.4 Prompt 3 from `docs/version/0.1.4/prompt_plan.md`.
+Start v0.1.5 Prompt 0 from `docs/version/0.1.5/prompt_plan.md`.
 
 Expected next change:
 
-- Implement managed CLIProxyAPI process launch, restart, and shutdown.
+- Add the complete provider catalog and upstream types.
 
 ## Version Roadmap
 
@@ -50,7 +56,7 @@ Expected next change:
 - [x] v0.1.1 Runtime Contract Spike: CLIProxyAPI management types, client, redaction, and tests.
 - [x] v0.1.2 Runtime Service And Minimal Config Renderer: main-process status service, settings storage, typed IPC, and simple config UI.
 - [x] v0.1.3 Runtime Connection GUI Hardening: diagnostics, endpoint copy, empty states, and editing affordances.
-- [ ] v0.1.4 Managed CLIProxyAPI Runtime, Software Config, And Tray MVP: YAML config, official download/update, process control, port ownership, tray status, and quick actions.
+- [x] v0.1.4 Managed CLIProxyAPI Runtime, Software Config, And Tray MVP: YAML config, official download/update, process control, port ownership, tray status, and quick actions.
 - [ ] v0.1.5 Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog: configure local client keys and every current CLIProxyAPI upstream family.
 - [ ] v0.2.0 Auth Management Surface: API/auth resources through CLIProxyAPI.
 - [ ] v0.3.0 Model Resource Inventory: model-first inventory with backing provider/auth details.

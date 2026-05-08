@@ -1,7 +1,7 @@
 # allmone v0.1.4 Todo
 
-Last updated: 2026-05-07
-Status: Planned
+Last updated: 2026-05-08
+Status: Complete
 
 ## Version Target
 
@@ -18,26 +18,26 @@ Definition of done:
 - [x] Store install metadata at `~/.allmone/runtime/install.json`.
 - [x] Download missing CLIProxyAPI executable from official releases.
 - [x] Check official release metadata and safely update stale managed executables.
-- [ ] Launch the managed executable from `~/.allmone/runtime/bin/`.
-- [ ] Restart and shutdown the allmone-managed CLIProxyAPI process.
+- [x] Launch the managed executable from `~/.allmone/runtime/bin/`.
+- [x] Restart and shutdown the allmone-managed CLIProxyAPI process.
 - [x] Generate and patch `~/.allmone/runtime/config.yaml` without erasing provider config.
 - [x] Let allmone own and save the API output port.
-- [ ] Derive and expose the safe OpenAI-compatible API base URL.
-- [ ] Add tray status and quick actions.
-- [ ] Keep secrets out of renderer localStorage/sessionStorage/IndexedDB/logs.
-- [ ] Keep allmone free of API proxying, provider adapters, routing, payload rules, and request/response transformation.
-- [ ] Run `bun run test`.
-- [ ] Run `bun run typecheck`.
-- [ ] Run `bun run build`.
-- [ ] Update root docs after implementation completion.
+- [x] Derive and expose the safe OpenAI-compatible API base URL.
+- [x] Add tray status and quick actions.
+- [x] Keep secrets out of renderer localStorage/sessionStorage/IndexedDB/logs.
+- [x] Keep allmone free of API proxying, provider adapters, routing, payload rules, and request/response transformation.
+- [x] Run `bun run test`.
+- [x] Run `bun run typecheck`.
+- [x] Run `bun run build`.
+- [x] Update root docs after implementation completion.
 
 ## Next Prompt
 
-Start v0.1.4 Prompt 3 from `docs/version/0.1.4/prompt_plan.md`.
+v0.1.4 is complete. Start v0.1.5 Prompt 0 from `docs/version/0.1.5/prompt_plan.md`.
 
 Expected next change:
 
-- Implement managed CLIProxyAPI process launch, restart, and shutdown.
+- Add the complete v0.1.5 upstream provider catalog and shared types.
 
 ## Guardrails
 
@@ -74,3 +74,13 @@ Expected next change:
 - Prompt 1 verification passed: `bun run test`, `bun run typecheck`.
 - Prompt 2 completed on 2026-05-07: added managed CLIProxyAPI YAML config patching, output port validation/save flow, derived Management API base URL initialization, and provider/payload preservation tests.
 - Prompt 2 verification passed: `bun run test`, `bun run typecheck`.
+- Prompt 3 completed on 2026-05-08: added managed CLIProxyAPI process controller, generated main-process management key handling, startup install/launch wiring, and clean quit stop handling.
+- Prompt 3 verification passed: `bun run test`, `bun run typecheck`.
+- Prompt 4 completed on 2026-05-08: added managed runtime state, output-port save, start/restart/stop/update IPC, safe API-base clipboard IPC, preload bridge, and renderer global types.
+- Prompt 4 verification passed: `bun run test`, `bun run typecheck`.
+- Prompt 5 completed on 2026-05-08: added tray controller with status, API base/port, open/copy/start/restart/stop/update/quit actions, and Electron tray wiring.
+- Prompt 5 verification passed: `bun run test`, `bun run typecheck`.
+- Prompt 6 completed on 2026-05-08: added compact renderer managed-runtime panel with install/update/process/port/API base controls while preserving provider editing.
+- Prompt 6 verification passed: `bun run typecheck`.
+- Prompt 7 completed on 2026-05-08: reviewed compact responsive UI rules, ran final verification, and updated active-version docs.
+- Prompt 7 verification passed: `bun run test`, `bun run typecheck`, `bun run build`.

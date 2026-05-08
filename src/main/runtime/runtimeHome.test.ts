@@ -34,6 +34,10 @@ test('resolves all managed runtime paths from the user home directory', () => {
     join(homeDir, '.allmone', 'runtime', 'config.yaml')
   )
   assert.equal(
+    paths.runtimeSettingsPath,
+    join(homeDir, '.allmone', 'runtime', 'runtime-settings.json')
+  )
+  assert.equal(
     paths.installMetadataPath,
     join(homeDir, '.allmone', 'runtime', 'install.json')
   )

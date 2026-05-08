@@ -23,6 +23,19 @@ contextBridge.exposeInMainWorld('allmone', {
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.testConnection),
     getConfigSummary: () =>
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.getConfigSummary),
+    saveOutputPort: (port: number) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.saveOutputPort, { port }),
+    ensureInstalledThenStart: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.ensureInstalledThenStart),
+    checkForUpdate: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.checkForUpdate),
+    startManagedRuntime: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.startManagedRuntime),
+    restartManagedRuntime: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.restartManagedRuntime),
+    stopManagedRuntime: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.stopManagedRuntime),
+    copyApiBase: () => ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.copyApiBase),
     upsertOpenAiCompatibilityProvider: (input: RuntimeOpenAiProviderInput) =>
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.upsertOpenAiProvider, input),
     deleteOpenAiCompatibilityProvider: (

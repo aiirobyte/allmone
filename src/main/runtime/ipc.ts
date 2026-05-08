@@ -10,6 +10,13 @@ export const RUNTIME_IPC_CHANNELS = {
   saveConnection: 'runtime:save-connection',
   testConnection: 'runtime:test-connection',
   getConfigSummary: 'runtime:get-config-summary',
+  saveOutputPort: 'runtime:save-output-port',
+  ensureInstalledThenStart: 'runtime:ensure-installed-then-start',
+  checkForUpdate: 'runtime:check-for-update',
+  startManagedRuntime: 'runtime:start-managed-runtime',
+  restartManagedRuntime: 'runtime:restart-managed-runtime',
+  stopManagedRuntime: 'runtime:stop-managed-runtime',
+  copyApiBase: 'runtime:copy-api-base',
   upsertOpenAiProvider: 'runtime:upsert-openai-provider',
   deleteOpenAiProvider: 'runtime:delete-openai-provider'
 } as const
@@ -26,6 +33,9 @@ export interface RuntimeIpcMain {
 export interface RuntimeIpcOptions {
   ipcMain: RuntimeIpcMain
   runtimeService: RuntimeService
+  clipboard?: {
+    writeText(value: string): void
+  }
 }
 
 export function registerRuntimeIpcHandlers(options: RuntimeIpcOptions): void {
@@ -41,6 +51,40 @@ export function registerRuntimeIpcHandlers(options: RuntimeIpcOptions): void {
   ipcMain.handle(RUNTIME_IPC_CHANNELS.getConfigSummary, () =>
     runtimeService.getConfigSummary()
   )
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.saveOutputPort, (_event, payload) =>
+    runtimeService.saveOutputPort(validatePortPayload(payload))
+  )
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.ensureInstalledThenStart, (_event, payload) => {
+    validateNoPayload(payload)
+    return runtimeService.ensureInstalledThenStart()
+  })
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.checkForUpdate, (_event, payload) => {
+    validateNoPayload(payload)
+    return runtimeService.checkForUpdate()
+  })
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.startManagedRuntime, (_event, payload) => {
+    validateNoPayload(payload)
+    return runtimeService.startManagedRuntime()
+  })
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.restartManagedRuntime, (_event, payload) => {
+    validateNoPayload(payload)
+    return runtimeService.restartManagedRuntime()
+  })
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.stopManagedRuntime, (_event, payload) => {
+    validateNoPayload(payload)
+    return runtimeService.stopManagedRuntime()
+  })
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.copyApiBase, (_event, payload) => {
+    validateNoPayload(payload)
+    const apiBaseUrl = runtimeService.getState().software?.runtime.apiBaseUrl
+
+    if (!apiBaseUrl) {
+      throw new Error('API base URL is unavailable')
+    }
+
+    options.clipboard?.writeText(apiBaseUrl)
+    return { value: apiBaseUrl }
+  })
   ipcMain.handle(RUNTIME_IPC_CHANNELS.upsertOpenAiProvider, (_event, payload) =>
     runtimeService.upsertOpenAiCompatibilityProvider(
       validateProviderPayload(payload)
@@ -49,6 +93,27 @@ export function registerRuntimeIpcHandlers(options: RuntimeIpcOptions): void {
   ipcMain.handle(RUNTIME_IPC_CHANNELS.deleteOpenAiProvider, (_event, payload) =>
     runtimeService.deleteOpenAiCompatibilityProvider(validateDeletePayload(payload))
   )
+}
+
+function validatePortPayload(value: unknown): number {
+  assertRecord(value)
+
+  if (
+    typeof value.port !== 'number' ||
+    !Number.isInteger(value.port) ||
+    value.port < 1 ||
+    value.port > 65_535
+  ) {
+    throwInvalidPayload()
+  }
+
+  return value.port
+}
+
+function validateNoPayload(value: unknown): void {
+  if (value !== undefined) {
+    throwInvalidPayload()
+  }
 }
 
 function validateConnectionPayload(

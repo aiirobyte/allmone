@@ -1,7 +1,7 @@
 # allmone v0.1.4 Spec
 
 Last updated: 2026-05-07
-Status: Planned
+Status: Complete
 
 ## Version Goal
 
