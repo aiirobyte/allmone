@@ -26,6 +26,7 @@ function runtimeState(
         port: 8317,
         timeoutMs: 5000,
         configPath: '/tmp/allmone/runtime/cli-proxy-api/config.yaml',
+        serviceOrigin: 'http://127.0.0.1:8317',
         apiBaseUrl: 'http://127.0.0.1:8317/v1',
         managementBaseUrl: 'http://127.0.0.1:8317/v0/management'
       }
@@ -81,14 +82,14 @@ function createHarness(state: RuntimeState = runtimeState()) {
   }
 }
 
-test('renders tray status, API base, and running-state command availability', () => {
+test('renders tray status, service origin, and running-state command availability', () => {
   const harness = createHarness()
 
   harness.controller.update()
 
   const labels = harness.menuItems.map((item) => item.label)
   assert(labels.includes('Status: Running'))
-  assert(labels.includes('API: http://127.0.0.1:8317/v1'))
+  assert(labels.includes('Service: http://127.0.0.1:8317'))
   assert(labels.includes('Port: 8317'))
   assert.equal(harness.tray.tooltip, 'allmone - Running')
   assert.equal(harness.menuItems.find((item) => item.label === 'Start CLIProxyAPI')?.enabled, false)
@@ -115,7 +116,7 @@ test('wires tray menu commands to runtime callbacks', async () => {
 
   harness.controller.update()
   await harness.menuItems.find((item) => item.label === 'Open Allmone')?.click?.()
-  await harness.menuItems.find((item) => item.label === 'Copy API Base')?.click?.()
+  await harness.menuItems.find((item) => item.label === 'Copy Service Origin')?.click?.()
   await harness.menuItems.find((item) => item.label === 'Restart CLIProxyAPI')?.click?.()
   await harness.menuItems.find((item) => item.label === 'Stop CLIProxyAPI')?.click?.()
   await harness.menuItems.find((item) => item.label === 'Check For Update')?.click?.()

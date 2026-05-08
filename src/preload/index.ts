@@ -6,6 +6,12 @@ import type {
   RuntimeConnectionSettingsInput,
   RuntimeOpenAiProviderInput
 } from '../main/runtime/types'
+import type {
+  ProviderLoginRunInput,
+  UpstreamAmpConfig,
+  UpstreamApiKeyCredentialInput,
+  UpstreamProviderKind
+} from '../main/upstreams'
 
 const electronAPI = {
   getVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version')
@@ -40,6 +46,35 @@ contextBridge.exposeInMainWorld('allmone', {
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.upsertOpenAiProvider, input),
     deleteOpenAiCompatibilityProvider: (
       input: CliProxyApiOpenAiCompatibilityDeleteInput
-    ) => ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.deleteOpenAiProvider, input)
+    ) => ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.deleteOpenAiProvider, input),
+    getUpstreamCatalog: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.getUpstreamCatalog),
+    getUpstreamSummaries: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.getUpstreamSummaries),
+    getLocalConnectionOutput: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.getLocalConnectionOutput),
+    generateLocalApiKey: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.generateLocalApiKey),
+    setLocalApiKey: (apiKey: string) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.setLocalApiKey, { apiKey }),
+    deleteLocalApiKey: (input: { value: string } | { index: number }) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.deleteLocalApiKey, input),
+    upsertApiKeyUpstream: (input: UpstreamApiKeyCredentialInput) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.upsertApiKeyUpstream, input),
+    deleteApiKeyUpstream: (
+      input: { providerKind: UpstreamProviderKind } & (
+        | { apiKey: string }
+        | { index: number }
+      )
+    ) => ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.deleteApiKeyUpstream, input),
+    writeAmpConfig: (input: UpstreamAmpConfig) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.writeAmpConfig, input),
+    resetAmpConfig: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.resetAmpConfig),
+    getAuthFiles: () => ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.getAuthFiles),
+    deleteAuthFile: (input: { name: string } | { all: true }) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.deleteAuthFile, input),
+    runLoginAction: (input: ProviderLoginRunInput) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.runLoginAction, input)
   }
 })

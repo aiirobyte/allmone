@@ -34,12 +34,12 @@ The project catalog includes these upstream provider kinds:
 
 ## CLIProxyAPI Output Types
 
-CLIProxyAPI can expose multiple client-facing output protocol surfaces over the local runtime. allmone should treat these as connection/output capabilities of the managed CLIProxyAPI process, not as provider logic owned by allmone.
+CLIProxyAPI can expose multiple client-facing output protocol surfaces over the local runtime. allmone should present the local service origin, such as `http://127.0.0.1:<port>`, as the user-facing root for these routes and treat protocol-specific paths as CLIProxyAPI capabilities, not provider logic owned by allmone.
 
 | Output type | Representative route shape | Client compatibility | allmone responsibility |
 | --- | --- | --- | --- |
-| OpenAI Chat Completions | `/v1/chat/completions` | OpenAI-compatible chat clients and SDKs | Show/copy base URL and local key; do not transform messages or responses |
-| OpenAI Responses | `/v1/responses` | OpenAI Responses-compatible clients, including Codex-style clients | Show/copy base URL and local key; do not implement Responses translation |
+| OpenAI Chat Completions | `/v1/chat/completions` | OpenAI-compatible chat clients and SDKs | Show the path from the local service origin and local key; do not transform messages or responses |
+| OpenAI Responses | `/v1/responses` | OpenAI Responses-compatible clients, including Codex-style clients | Show the path from the local service origin and local key; do not implement Responses translation |
 | Gemini native generate content | `/v1beta/models/...` or provider-specific Gemini route shapes | Gemini/Google GenAI-compatible clients | Expose availability as CLIProxyAPI capability; do not implement Gemini protocol handling |
 | Claude native messages | `/v1/messages` and `/v1/messages/count_tokens` where supported | Anthropic/Claude-compatible clients | Expose availability as CLIProxyAPI capability; do not implement Claude protocol handling or token counting |
 | Image generation/editing | `/v1/images/generations`, `/v1/images/edits` where enabled | OpenAI-style image clients | Reflect enabled/disabled state when CLIProxyAPI exposes it; do not implement image generation |

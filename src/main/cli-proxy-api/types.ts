@@ -58,6 +58,45 @@ export interface CliProxyApiKeyEntry extends CliProxyApiJsonObject {
   'auth-index'?: string
 }
 
+export interface CliProxyApiUpstreamApiKeyEntry extends CliProxyApiJsonObject {
+  'api-key'?: string
+  'auth-index'?: string
+  'base-url'?: string
+  prefix?: string
+  disabled?: boolean
+  headers?: Record<string, string>
+  'proxy-url'?: string
+  models?: CliProxyApiModelAlias[]
+  'excluded-models'?: string[]
+}
+
+export type CliProxyApiApiKeyPatchInput =
+  | { old: string; new: string; index?: never; value?: never }
+  | { index: number; value: string; old?: never; new?: never }
+
+export type CliProxyApiApiKeyDeleteInput =
+  | { value: string; index?: never }
+  | { index: number; value?: never }
+
+export type CliProxyApiUpstreamApiKeyPatchInput =
+  | { index: number; value: CliProxyApiUpstreamApiKeyEntry; match?: never }
+  | { match: string; value: CliProxyApiUpstreamApiKeyEntry; index?: never }
+
+export type CliProxyApiUpstreamApiKeyDeleteInput =
+  | { apiKey: string; index?: never }
+  | { index: number; apiKey?: never }
+
+export type CliProxyApiUpstreamApiKeySection =
+  | 'gemini-api-key'
+  | 'codex-api-key'
+  | 'claude-api-key'
+  | 'vertex-api-key'
+
+export interface CliProxyApiUpstreamApiKeySectionResult {
+  entries: CliProxyApiUpstreamApiKeyEntry[]
+  raw: CliProxyApiJsonObject
+}
+
 export interface CliProxyApiOpenAiCompatibilityProvider extends CliProxyApiJsonObject {
   name?: string
   disabled?: boolean
@@ -210,6 +249,10 @@ export interface CliProxyApiAuthFilesResult {
   raw: CliProxyApiAuthFilesResponse
 }
 
+export type CliProxyApiAuthFileDeleteInput =
+  | { name: string; all?: never }
+  | { all: true; name?: never }
+
 export interface CliProxyApiOpenAiCompatibilityResponse
   extends CliProxyApiJsonObject {
   'openai-compatibility'?: CliProxyApiOpenAiCompatibilityProvider[]
@@ -218,6 +261,81 @@ export interface CliProxyApiOpenAiCompatibilityResponse
 export interface CliProxyApiOpenAiCompatibilityResult {
   providers: CliProxyApiOpenAiCompatibilityProvider[]
   raw: CliProxyApiOpenAiCompatibilityResponse
+}
+
+export interface CliProxyApiAmpCodeApiKeyMapping extends CliProxyApiJsonObject {
+  'upstream-api-key'?: string
+  'api-keys'?: string[]
+}
+
+export interface CliProxyApiAmpCodeModelMapping extends CliProxyApiJsonObject {
+  from?: string
+  to?: string
+}
+
+export interface CliProxyApiAmpCodeConfig extends CliProxyApiJsonObject {
+  'upstream-url'?: string
+  'upstream-api-key'?: string
+  'upstream-api-keys'?: CliProxyApiAmpCodeApiKeyMapping[]
+  'restrict-management-to-localhost'?: boolean
+  'force-model-mappings'?: boolean
+  'model-mappings'?: CliProxyApiAmpCodeModelMapping[]
+}
+
+export interface CliProxyApiAmpCodeResponse extends CliProxyApiJsonObject {
+  ampcode?: CliProxyApiAmpCodeConfig
+}
+
+export interface CliProxyApiAmpCodeResult {
+  config: CliProxyApiAmpCodeConfig
+  raw: CliProxyApiAmpCodeResponse
+}
+
+export interface CliProxyApiOauthModelAliasRow extends CliProxyApiJsonObject {
+  name?: string
+  alias?: string
+  fork?: boolean
+}
+
+export type CliProxyApiOauthModelAliasMap = Record<
+  string,
+  CliProxyApiOauthModelAliasRow[]
+>
+
+export interface CliProxyApiOauthModelAliasResponse extends CliProxyApiJsonObject {
+  'oauth-model-alias'?: CliProxyApiOauthModelAliasMap
+}
+
+export interface CliProxyApiOauthModelAliasResult {
+  aliases: CliProxyApiOauthModelAliasMap
+  raw: CliProxyApiOauthModelAliasResponse
+}
+
+export interface CliProxyApiOauthModelAliasPatchInput extends CliProxyApiJsonObject {
+  provider: string
+  models: CliProxyApiOauthModelAliasRow[]
+}
+
+export type CliProxyApiOauthExcludedModelsMap = Record<string, string[]>
+
+export interface CliProxyApiOauthExcludedModelsResponse
+  extends CliProxyApiJsonObject {
+  'oauth-excluded-models'?: CliProxyApiOauthExcludedModelsMap
+}
+
+export interface CliProxyApiOauthExcludedModelsResult {
+  excludedModels: CliProxyApiOauthExcludedModelsMap
+  raw: CliProxyApiOauthExcludedModelsResponse
+}
+
+export interface CliProxyApiOauthExcludedModelsPatchInput
+  extends CliProxyApiJsonObject {
+  provider: string
+  models: string[]
+}
+
+export interface CliProxyApiOauthProviderDeleteInput {
+  provider: string
 }
 
 export interface CliProxyApiWriteStatusResponse extends CliProxyApiJsonObject {

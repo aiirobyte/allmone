@@ -8,6 +8,12 @@ import {
 } from './errors'
 import {
   CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL,
+  type CliProxyApiAmpCodeConfig,
+  type CliProxyApiAmpCodeResponse,
+  type CliProxyApiAmpCodeResult,
+  type CliProxyApiApiKeyDeleteInput,
+  type CliProxyApiApiKeyPatchInput,
+  type CliProxyApiAuthFileDeleteInput,
   type CliProxyApiAuthFilesResponse,
   type CliProxyApiAuthFilesResult,
   type CliProxyApiClientOptions,
@@ -22,10 +28,24 @@ import {
   type CliProxyApiLatestVersionResponse,
   type CliProxyApiLatestVersionResult,
   type CliProxyApiManagementCheckResult,
+  type CliProxyApiOauthExcludedModelsMap,
+  type CliProxyApiOauthExcludedModelsPatchInput,
+  type CliProxyApiOauthExcludedModelsResponse,
+  type CliProxyApiOauthExcludedModelsResult,
+  type CliProxyApiOauthModelAliasMap,
+  type CliProxyApiOauthModelAliasPatchInput,
+  type CliProxyApiOauthModelAliasResponse,
+  type CliProxyApiOauthModelAliasResult,
+  type CliProxyApiOauthProviderDeleteInput,
   type CliProxyApiOpenAiCompatibilityDeleteInput,
   type CliProxyApiOpenAiCompatibilityProviderInput,
   type CliProxyApiOpenAiCompatibilityResponse,
   type CliProxyApiOpenAiCompatibilityResult,
+  type CliProxyApiUpstreamApiKeyDeleteInput,
+  type CliProxyApiUpstreamApiKeyEntry,
+  type CliProxyApiUpstreamApiKeyPatchInput,
+  type CliProxyApiUpstreamApiKeySection,
+  type CliProxyApiUpstreamApiKeySectionResult,
   type CliProxyApiUsageQueueResponse,
   type CliProxyApiUsageQueueResult,
   type CliProxyApiUsageStatisticsEnabledResponse,
@@ -124,6 +144,40 @@ export class CliProxyApiClient {
     }
   }
 
+  async putApiKeys(apiKeys: string[]): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PUT',
+      'api-keys',
+      { body: apiKeys }
+    )
+
+    return toWriteResult(response)
+  }
+
+  async patchApiKey(
+    input: CliProxyApiApiKeyPatchInput
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PATCH',
+      'api-keys',
+      { body: input }
+    )
+
+    return toWriteResult(response)
+  }
+
+  async deleteApiKey(
+    input: CliProxyApiApiKeyDeleteInput
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'DELETE',
+      'api-keys',
+      { query: 'value' in input ? { value: input.value } : { index: input.index } }
+    )
+
+    return toWriteResult(response)
+  }
+
   async getApiKeyUsage(): Promise<CliProxyApiKeyUsageResult> {
     const raw =
       await this.getJsonValue<CliProxyApiKeyUsageResponse>('api-key-usage')
@@ -142,6 +196,250 @@ export class CliProxyApiClient {
     }
   }
 
+  async deleteAuthFile(
+    input: CliProxyApiAuthFileDeleteInput
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'DELETE',
+      'auth-files',
+      { query: 'name' in input ? { name: input.name } : { all: true } }
+    )
+
+    return toWriteResult(response)
+  }
+
+  async getGeminiApiKeyEntries(): Promise<CliProxyApiUpstreamApiKeySectionResult> {
+    return this.getApiKeySection('gemini-api-key')
+  }
+
+  async putGeminiApiKeyEntries(
+    entries: CliProxyApiUpstreamApiKeyEntry[]
+  ): Promise<CliProxyApiWriteResult> {
+    return this.putApiKeySection('gemini-api-key', entries)
+  }
+
+  async patchGeminiApiKeyEntry(
+    input: CliProxyApiUpstreamApiKeyPatchInput
+  ): Promise<CliProxyApiWriteResult> {
+    return this.patchApiKeySection('gemini-api-key', input)
+  }
+
+  async deleteGeminiApiKeyEntry(
+    input: CliProxyApiUpstreamApiKeyDeleteInput
+  ): Promise<CliProxyApiWriteResult> {
+    return this.deleteApiKeySection('gemini-api-key', input)
+  }
+
+  async getCodexApiKeyEntries(): Promise<CliProxyApiUpstreamApiKeySectionResult> {
+    return this.getApiKeySection('codex-api-key')
+  }
+
+  async putCodexApiKeyEntries(
+    entries: CliProxyApiUpstreamApiKeyEntry[]
+  ): Promise<CliProxyApiWriteResult> {
+    return this.putApiKeySection('codex-api-key', entries)
+  }
+
+  async patchCodexApiKeyEntry(
+    input: CliProxyApiUpstreamApiKeyPatchInput
+  ): Promise<CliProxyApiWriteResult> {
+    return this.patchApiKeySection('codex-api-key', input)
+  }
+
+  async deleteCodexApiKeyEntry(
+    input: CliProxyApiUpstreamApiKeyDeleteInput
+  ): Promise<CliProxyApiWriteResult> {
+    return this.deleteApiKeySection('codex-api-key', input)
+  }
+
+  async getClaudeApiKeyEntries(): Promise<CliProxyApiUpstreamApiKeySectionResult> {
+    return this.getApiKeySection('claude-api-key')
+  }
+
+  async putClaudeApiKeyEntries(
+    entries: CliProxyApiUpstreamApiKeyEntry[]
+  ): Promise<CliProxyApiWriteResult> {
+    return this.putApiKeySection('claude-api-key', entries)
+  }
+
+  async patchClaudeApiKeyEntry(
+    input: CliProxyApiUpstreamApiKeyPatchInput
+  ): Promise<CliProxyApiWriteResult> {
+    return this.patchApiKeySection('claude-api-key', input)
+  }
+
+  async deleteClaudeApiKeyEntry(
+    input: CliProxyApiUpstreamApiKeyDeleteInput
+  ): Promise<CliProxyApiWriteResult> {
+    return this.deleteApiKeySection('claude-api-key', input)
+  }
+
+  async getVertexApiKeyEntries(): Promise<CliProxyApiUpstreamApiKeySectionResult> {
+    return this.getApiKeySection('vertex-api-key')
+  }
+
+  async putVertexApiKeyEntries(
+    entries: CliProxyApiUpstreamApiKeyEntry[]
+  ): Promise<CliProxyApiWriteResult> {
+    return this.putApiKeySection('vertex-api-key', entries)
+  }
+
+  async patchVertexApiKeyEntry(
+    input: CliProxyApiUpstreamApiKeyPatchInput
+  ): Promise<CliProxyApiWriteResult> {
+    return this.patchApiKeySection('vertex-api-key', input)
+  }
+
+  async deleteVertexApiKeyEntry(
+    input: CliProxyApiUpstreamApiKeyDeleteInput
+  ): Promise<CliProxyApiWriteResult> {
+    return this.deleteApiKeySection('vertex-api-key', input)
+  }
+
+  async getAmpCodeConfig(): Promise<CliProxyApiAmpCodeResult> {
+    const raw = await this.getJsonValue<CliProxyApiAmpCodeResponse>('ampcode')
+
+    return {
+      config: isJsonObject(raw.ampcode)
+        ? (raw.ampcode as CliProxyApiAmpCodeConfig)
+        : {},
+      raw
+    }
+  }
+
+  async putAmpCodeConfig(
+    config: CliProxyApiAmpCodeConfig
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PUT',
+      'ampcode',
+      { body: config }
+    )
+
+    return toWriteResult(response)
+  }
+
+  async patchAmpCodeConfig(
+    config: Partial<CliProxyApiAmpCodeConfig>
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PATCH',
+      'ampcode',
+      { body: config }
+    )
+
+    return toWriteResult(response)
+  }
+
+  async deleteAmpCodeConfig(): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'DELETE',
+      'ampcode'
+    )
+
+    return toWriteResult(response)
+  }
+
+  async getOauthModelAlias(): Promise<CliProxyApiOauthModelAliasResult> {
+    const raw =
+      await this.getJsonValue<CliProxyApiOauthModelAliasResponse>(
+        'oauth-model-alias'
+      )
+
+    return {
+      aliases: isRecord(raw['oauth-model-alias'])
+        ? (raw['oauth-model-alias'] as CliProxyApiOauthModelAliasMap)
+        : {},
+      raw
+    }
+  }
+
+  async putOauthModelAlias(
+    aliases: CliProxyApiOauthModelAliasMap
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PUT',
+      'oauth-model-alias',
+      { body: aliases }
+    )
+
+    return toWriteResult(response)
+  }
+
+  async patchOauthModelAlias(
+    input: CliProxyApiOauthModelAliasPatchInput
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PATCH',
+      'oauth-model-alias',
+      { body: input }
+    )
+
+    return toWriteResult(response)
+  }
+
+  async deleteOauthModelAlias(
+    input: CliProxyApiOauthProviderDeleteInput
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'DELETE',
+      'oauth-model-alias',
+      { query: { provider: input.provider } }
+    )
+
+    return toWriteResult(response)
+  }
+
+  async getOauthExcludedModels(): Promise<CliProxyApiOauthExcludedModelsResult> {
+    const raw =
+      await this.getJsonValue<CliProxyApiOauthExcludedModelsResponse>(
+        'oauth-excluded-models'
+      )
+
+    return {
+      excludedModels: isRecord(raw['oauth-excluded-models'])
+        ? (raw['oauth-excluded-models'] as CliProxyApiOauthExcludedModelsMap)
+        : {},
+      raw
+    }
+  }
+
+  async putOauthExcludedModels(
+    excludedModels: CliProxyApiOauthExcludedModelsMap
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PUT',
+      'oauth-excluded-models',
+      { body: excludedModels }
+    )
+
+    return toWriteResult(response)
+  }
+
+  async patchOauthExcludedModels(
+    input: CliProxyApiOauthExcludedModelsPatchInput
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PATCH',
+      'oauth-excluded-models',
+      { body: input }
+    )
+
+    return toWriteResult(response)
+  }
+
+  async deleteOauthExcludedModels(
+    input: CliProxyApiOauthProviderDeleteInput
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'DELETE',
+      'oauth-excluded-models',
+      { query: { provider: input.provider } }
+    )
+
+    return toWriteResult(response)
+  }
+
   async getOpenAiCompatibilityProviders(): Promise<CliProxyApiOpenAiCompatibilityResult> {
     const raw =
       await this.getJsonValue<CliProxyApiOpenAiCompatibilityResponse>(
@@ -154,6 +452,62 @@ export class CliProxyApiClient {
         : [],
       raw
     }
+  }
+
+  private async getApiKeySection(
+    section: CliProxyApiUpstreamApiKeySection
+  ): Promise<CliProxyApiUpstreamApiKeySectionResult> {
+    const raw = await this.getJsonValue<CliProxyApiJsonObject>(section)
+    const entries = raw[section]
+
+    return {
+      entries: Array.isArray(entries) ? entries : [],
+      raw
+    }
+  }
+
+  private async putApiKeySection(
+    section: CliProxyApiUpstreamApiKeySection,
+    entries: CliProxyApiUpstreamApiKeyEntry[]
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PUT',
+      section,
+      { body: entries }
+    )
+
+    return toWriteResult(response)
+  }
+
+  private async patchApiKeySection(
+    section: CliProxyApiUpstreamApiKeySection,
+    input: CliProxyApiUpstreamApiKeyPatchInput
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PATCH',
+      section,
+      { body: input }
+    )
+
+    return toWriteResult(response)
+  }
+
+  private async deleteApiKeySection(
+    section: CliProxyApiUpstreamApiKeySection,
+    input: CliProxyApiUpstreamApiKeyDeleteInput
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'DELETE',
+      section,
+      {
+        query:
+          'apiKey' in input
+            ? { 'api-key': input.apiKey }
+            : { index: input.index }
+      }
+    )
+
+    return toWriteResult(response)
   }
 
   async upsertOpenAiCompatibilityProvider(
@@ -373,6 +727,14 @@ function toWriteResult(
     status: response.status,
     raw: response.value
   }
+}
+
+function isJsonObject(value: unknown): value is CliProxyApiJsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return isJsonObject(value)
 }
 
 function getGlobalFetch(): CliProxyApiFetch {

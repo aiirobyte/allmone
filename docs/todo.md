@@ -10,14 +10,14 @@ Read CLAUDE.md and docs/todo.md, then continue with the active version's next un
 
 ## Active Version
 
-Active version: `0.1.5` planned
+Active version: `0.2.0` planned
 
-- Previous version: `docs/version/0.1.4/`
-- Active version docs: `docs/version/0.1.5/`
+- Previous version: `docs/version/0.1.5/`
+- Active version docs: `docs/version/0.2.0/` (not created yet)
 
 ## Current Target
 
-Target: v0.1.5 Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog.
+Target: v0.2.0 Auth Management Surface.
 
 Definition of done:
 
@@ -40,15 +40,19 @@ Definition of done:
 - [x] Create `docs/version/0.1.5/spec.md`.
 - [x] Create `docs/version/0.1.5/prompt_plan.md`.
 - [x] Create `docs/version/0.1.5/todo.md`.
-- [ ] Add upstream provider catalog for every current CLIProxyAPI upstream family.
+- [x] Add upstream provider catalog for every current CLIProxyAPI upstream family.
+- [x] Complete v0.1.5 real local proxy setup, upstream services, IPC, renderer controls, login handoffs, and build verification.
+- [ ] Create `docs/version/0.2.0/spec.md`.
+- [ ] Create `docs/version/0.2.0/prompt_plan.md`.
+- [ ] Create `docs/version/0.2.0/todo.md`.
 
 ## Next Prompt
 
-Start v0.1.5 Prompt 0 from `docs/version/0.1.5/prompt_plan.md`.
+Create v0.2.0 planning files.
 
 Expected next change:
 
-- Add the complete provider catalog and upstream types.
+- Plan Auth Management Surface around CLIProxyAPI Management API without moving token contents into renderer state.
 
 ## Version Roadmap
 
@@ -57,7 +61,7 @@ Expected next change:
 - [x] v0.1.2 Runtime Service And Minimal Config Renderer: main-process status service, settings storage, typed IPC, and simple config UI.
 - [x] v0.1.3 Runtime Connection GUI Hardening: diagnostics, endpoint copy, empty states, and editing affordances.
 - [x] v0.1.4 Managed CLIProxyAPI Runtime, Software Config, And Tray MVP: YAML config, official download/update, process control, port ownership, tray status, and quick actions.
-- [ ] v0.1.5 Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog: configure local client keys and every current CLIProxyAPI upstream family.
+- [x] v0.1.5 Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog: configure local client keys and every current CLIProxyAPI upstream family.
 - [ ] v0.2.0 Auth Management Surface: API/auth resources through CLIProxyAPI.
 - [ ] v0.3.0 Model Resource Inventory: model-first inventory with backing provider/auth details.
 - [ ] v0.4.0 Usage And Logs: request log, usage, queue, and error visibility.
@@ -86,4 +90,7 @@ Expected next change:
 - 2026-05-08: Startup install check now adopts an existing managed CLIProxyAPI executable without fetching release metadata; manual Check Update remains the network update path.
 - 2026-05-08: Auto-start now enters `starting` immediately during install validation and only shows `installing` when the managed executable is missing.
 - 2026-05-08: OpenAI-compatible provider creation now appends through CLIProxyAPI `GET` + `PUT`; existing providers still update through `PATCH`.
+- 2026-05-08: v0.1.5 Prompt 0 completed with data-only upstream catalog/types and tests; next prompt is Management API client expansion.
+- 2026-05-08: v0.1.5 Prompt 1 completed with typed CLIProxyAPI Management API client upstream route methods and fake-fetch tests; next prompt is UpstreamService and redaction.
+- 2026-05-08: v0.1.5 completed. Added full upstream catalog/types, typed Management API client routes, `UpstreamService`, API-key CRUD, local client key flow, Amp flow, auth-file summaries, managed auth-dir, provider login/import runner, upstream IPC/preload, compact renderer setup UI, and verification (`bun run test`, `bun run typecheck`, `bun run build`). Browser visual verification could not run because the Browser Node runner was not available through tool discovery.
 - Update this file and the active version todo after every meaningful coding session.

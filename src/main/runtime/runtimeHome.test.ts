@@ -42,6 +42,10 @@ test('resolves all managed runtime paths from the user home directory', () => {
     join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'tmp')
   )
   assert.equal(
+    paths.runtimeAuthDir,
+    join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'auth')
+  )
+  assert.equal(
     paths.runtimeConfigPath,
     join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'config.yaml')
   )
@@ -71,7 +75,8 @@ test('creates the runtime home directory tree', async () => {
       paths.runtimeBinDir,
       paths.runtimeDownloadsDir,
       paths.runtimeLogsDir,
-      paths.runtimeTmpDir
+      paths.runtimeTmpDir,
+      paths.runtimeAuthDir
     ]) {
       await access(path)
     }

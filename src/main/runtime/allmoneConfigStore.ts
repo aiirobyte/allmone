@@ -26,6 +26,7 @@ export interface AllmoneSoftwareConfig {
     port: number
     timeoutMs: number
     configPath: string
+    serviceOrigin: string
     apiBaseUrl: string
     managementBaseUrl: string
   }
@@ -156,6 +157,7 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
           runtime.configPath,
           this.runtimeHome
         ),
+        serviceOrigin: buildServiceOrigin(host, port),
         apiBaseUrl: buildApiBaseUrl(host, port),
         managementBaseUrl: buildManagementBaseUrl(host, port)
       }
@@ -339,7 +341,11 @@ function isPathInside(path: string, parentDir: string): boolean {
 }
 
 function buildApiBaseUrl(host: string, port: number): string {
-  return `http://${host}:${port}/v1`
+  return `${buildServiceOrigin(host, port)}/v1`
+}
+
+function buildServiceOrigin(host: string, port: number): string {
+  return `http://${host}:${port}`
 }
 
 function buildManagementBaseUrl(host: string, port: number): string {

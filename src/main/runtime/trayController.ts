@@ -48,7 +48,7 @@ class DefaultTrayController implements TrayController {
 
   update(state: RuntimeState = this.options.getState()): void {
     const managedStatus = state.managed?.status ?? 'missing'
-    const apiBaseUrl = state.software?.runtime.apiBaseUrl
+    const serviceOrigin = state.software?.runtime.serviceOrigin
     const port = state.software?.runtime.port
     const canStart = !isBusyStatus(managedStatus) && managedStatus !== 'running'
     const canControlRunning = managedStatus === 'running'
@@ -59,7 +59,7 @@ class DefaultTrayController implements TrayController {
         enabled: false
       },
       {
-        label: apiBaseUrl ? `API: ${apiBaseUrl}` : 'API: Unavailable',
+        label: serviceOrigin ? `Service: ${serviceOrigin}` : 'Service: Unavailable',
         enabled: false
       },
       {
@@ -69,8 +69,8 @@ class DefaultTrayController implements TrayController {
       { type: 'separator' },
       { label: 'Open Allmone', click: this.options.openMainWindow },
       {
-        label: 'Copy API Base',
-        enabled: Boolean(apiBaseUrl),
+        label: 'Copy Service Origin',
+        enabled: Boolean(serviceOrigin),
         click: () => this.options.copyApiBase()
       },
       { type: 'separator' },

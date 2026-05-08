@@ -6,6 +6,7 @@ import {
   registerRuntimeIpcHandlers
 } from './ipc'
 import type { RuntimeService } from './service'
+import type { ProviderLoginRunner, UpstreamService } from '../upstreams'
 
 type Handler = (_event: unknown, payload?: unknown) => Promise<unknown> | unknown
 
@@ -67,6 +68,7 @@ function createFakeService(): RuntimeService & {
             port: 8317,
             timeoutMs: 5000,
             configPath: '/tmp/allmone/runtime/cli-proxy-api/config.yaml',
+            serviceOrigin: 'http://127.0.0.1:8317',
             apiBaseUrl: 'http://127.0.0.1:8317/v1',
             managementBaseUrl: 'http://127.0.0.1:8317/v0/management'
           }
@@ -146,6 +148,103 @@ function createFakeClipboard() {
     writes,
     writeText(value: string) {
       writes.push(value)
+    }
+  }
+}
+
+function createFakeUpstreamService(): UpstreamService & { calls: string[] } {
+  return {
+    calls: [],
+    getProviderCatalog() {
+      this.calls.push('catalog')
+      return []
+    },
+    async getLocalApiKeyState() {
+      return { configured: false, count: 0, redactedKeys: [] }
+    },
+    async generateLocalApiKey() {
+      this.calls.push('generate-local')
+      return {
+        configured: true,
+        count: 1,
+        redactedKeys: ['[REDACTED]'],
+        oneTimePlaintextKey: 'local-secret'
+      }
+    },
+    async setLocalApiKey() {
+      this.calls.push('set-local')
+      return {
+        configured: true,
+        count: 1,
+        redactedKeys: ['[REDACTED]'],
+        oneTimePlaintextKey: 'local-secret'
+      }
+    },
+    async deleteLocalApiKey() {
+      this.calls.push('delete-local')
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async getLocalConnectionOutput(input) {
+      this.calls.push('connection-output')
+      return {
+        serviceOrigin: input.serviceOrigin,
+        port: input.port,
+        localKeyConfigured: true,
+        snippets: { curl: 'curl', openAiSdk: 'base_url' }
+      }
+    },
+    async getUpstreamSummaries() {
+      this.calls.push('summaries')
+      return []
+    },
+    async upsertApiKeyUpstream() {
+      this.calls.push('upsert-api-key')
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async deleteApiKeyUpstream() {
+      this.calls.push('delete-api-key')
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async getAmpConfig() {
+      return {}
+    },
+    async writeAmpConfig() {
+      this.calls.push('write-amp')
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async resetAmpConfig() {
+      this.calls.push('reset-amp')
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async getAuthFileSummaries() {
+      this.calls.push('auth-files')
+      return []
+    },
+    async deleteAuthFile() {
+      this.calls.push('delete-auth-file')
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async getOauthModelAliases() {
+      return {}
+    },
+    async writeOauthModelAliases() {
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async getOauthExcludedModels() {
+      return {}
+    },
+    async writeOauthExcludedModels() {
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    }
+  }
+}
+
+function createFakeLoginRunner(): ProviderLoginRunner & { calls: unknown[] } {
+  return {
+    calls: [],
+    async run(input) {
+      this.calls.push(input)
+      return { ok: true, exitCode: 0, signal: null }
     }
   }
 }
@@ -254,7 +353,7 @@ test('validates managed runtime port and command IPC payloads', async () => {
   ])
 })
 
-test('copies only the safe OpenAI-compatible API base through main clipboard', async () => {
+test('copies only the safe local service origin through main clipboard', async () => {
   const ipc = createFakeIpcMain()
   const service = createFakeService()
   const clipboard = createFakeClipboard()
@@ -266,6 +365,70 @@ test('copies only the safe OpenAI-compatible API base through main clipboard', a
 
   const result = await ipc.invoke(RUNTIME_IPC_CHANNELS.copyApiBase)
 
-  assert.deepEqual(clipboard.writes, ['http://127.0.0.1:8317/v1'])
-  assert.deepEqual(result, { value: 'http://127.0.0.1:8317/v1' })
+  assert.deepEqual(clipboard.writes, ['http://127.0.0.1:8317'])
+  assert.deepEqual(result, { value: 'http://127.0.0.1:8317' })
+})
+
+test('validates upstream IPC payloads before calling upstream services', async () => {
+  const ipc = createFakeIpcMain()
+  const service = createFakeService()
+  const upstreamService = createFakeUpstreamService()
+  const providerLoginRunner = createFakeLoginRunner()
+  registerRuntimeIpcHandlers({
+    ipcMain: ipc.ipcMain,
+    runtimeService: service,
+    upstreamService,
+    providerLoginRunner
+  })
+
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.getUpstreamCatalog)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.getUpstreamSummaries)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.getLocalConnectionOutput)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.generateLocalApiKey)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.setLocalApiKey, { apiKey: 'local-secret' })
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.deleteLocalApiKey, { value: 'local-secret' })
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.upsertApiKeyUpstream, {
+    providerKind: 'gemini-api-key',
+    apiKey: 'provider-secret'
+  })
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.deleteApiKeyUpstream, {
+    providerKind: 'gemini-api-key',
+    apiKey: 'provider-secret'
+  })
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.writeAmpConfig, {
+    upstreamUrl: 'https://amp.example.com'
+  })
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.resetAmpConfig)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.getAuthFiles)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.deleteAuthFile, { name: 'claude.json' })
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.runLoginAction, { kind: 'claude-login' })
+
+  await assert.rejects(
+    async () => {
+      await ipc.invoke(RUNTIME_IPC_CHANNELS.upsertApiKeyUpstream, {
+        providerKind: 'bad-kind',
+        apiKey: 'provider-secret'
+      })
+    },
+    (error) =>
+      error instanceof Error &&
+      error.message === 'Invalid runtime IPC payload' &&
+      !error.message.includes('provider-secret')
+  )
+
+  assert.deepEqual(upstreamService.calls, [
+    'catalog',
+    'summaries',
+    'connection-output',
+    'generate-local',
+    'set-local',
+    'delete-local',
+    'upsert-api-key',
+    'delete-api-key',
+    'write-amp',
+    'reset-amp',
+    'auth-files',
+    'delete-auth-file'
+  ])
+  assert.deepEqual(providerLoginRunner.calls, [{ kind: 'claude-login', importPath: undefined }])
 })

@@ -21,7 +21,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -50,7 +51,8 @@ button.danger {
   color: #9f2f25;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-width: 0;
   min-height: 36px;
@@ -70,6 +72,17 @@ input:focus {
 input[readonly] {
   background: #f6f8fb;
   color: #4b5563;
+}
+
+pre {
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  border-radius: 6px;
+  background: #f6f8fb;
+  padding: 8px;
+  color: #374151;
+  font-size: 0.76rem;
 }
 
 #app {
@@ -181,14 +194,55 @@ h3 {
 }
 
 .provider-surface,
-.managed-surface {
+.managed-surface,
+.upstream-surface {
   padding: 16px;
 }
 
-.managed-surface {
+.managed-surface,
+.upstream-surface {
   display: grid;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.upstream-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.upstream-block {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.summary-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.summary-row span,
+.upstream-block span {
+  color: #667085;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .section-heading {

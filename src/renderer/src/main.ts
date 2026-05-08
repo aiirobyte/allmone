@@ -5,6 +5,13 @@ import type {
   RuntimeOpenAiProviderSummary,
   RuntimeState
 } from '../../main/runtime/types'
+import type {
+  LocalConnectionOutput,
+  UpstreamAuthFileSummary,
+  UpstreamProviderCatalogEntry,
+  UpstreamProviderKind,
+  UpstreamProviderSummary
+} from '../../main/upstreams'
 
 const app = document.querySelector<HTMLDivElement>('#app')
 
@@ -39,6 +46,11 @@ type ViewState = {
   runtimeState: RuntimeState | null
   configSummary: RuntimeConfigSummary | null
   configLoadError: string | null
+  upstreamCatalog: UpstreamProviderCatalogEntry[]
+  upstreamSummaries: UpstreamProviderSummary[]
+  authFiles: UpstreamAuthFileSummary[]
+  localConnection: LocalConnectionOutput | null
+  localKeyPlaintext: string | null
   providerDraft: ProviderDraft
   selectedProviderName: string | null
   busyAction: string | null
@@ -59,6 +71,11 @@ const state: ViewState = {
   runtimeState: null,
   configSummary: null,
   configLoadError: null,
+  upstreamCatalog: [],
+  upstreamSummaries: [],
+  authFiles: [],
+  localConnection: null,
+  localKeyPlaintext: null,
   providerDraft: emptyProviderDraft(),
   selectedProviderName: null,
   busyAction: 'Loading',
@@ -91,6 +108,7 @@ async function bootstrap(): Promise<void> {
 
       state.configSummary = config.summary
       state.configLoadError = config.error
+      await loadUpstreams()
     } else {
       state.configSummary = null
       state.configLoadError = null
@@ -101,6 +119,24 @@ async function bootstrap(): Promise<void> {
     state.busyAction = null
     render()
     scheduleManagedStateRefresh()
+  }
+}
+
+async function loadUpstreams(): Promise<void> {
+  try {
+    const [catalog, summaries, authFiles, localConnection] = await Promise.all([
+      window.allmone.runtime.getUpstreamCatalog(),
+      window.allmone.runtime.getUpstreamSummaries(),
+      window.allmone.runtime.getAuthFiles(),
+      window.allmone.runtime.getLocalConnectionOutput()
+    ])
+
+    state.upstreamCatalog = catalog
+    state.upstreamSummaries = summaries
+    state.authFiles = authFiles
+    state.localConnection = localConnection
+  } catch (error) {
+    state.configLoadError = toMessage(error)
   }
 }
 
@@ -136,6 +172,8 @@ function render(): void {
 
       ${renderManagedRuntimePanel()}
 
+      ${renderUpstreamPanel()}
+
       <section class="surface provider-surface">
         <div class="section-heading">
           <h2>OpenAI-Compatible Providers</h2>
@@ -150,6 +188,135 @@ function render(): void {
   `
 
   bindEventHandlers()
+}
+
+function renderUpstreamPanel(): string {
+  const local = state.localConnection
+  const apiKeySummaries = state.upstreamSummaries.filter((summary) =>
+    ['gemini-api-key', 'codex-api-key', 'claude-api-key', 'vertex-api-key', 'openai-compatibility'].includes(summary.providerKind)
+  )
+  const accountSummaries = state.upstreamSummaries.filter((summary) =>
+    ['gemini-cli', 'aistudio', 'antigravity', 'claude', 'codex', 'kimi', 'vertex'].includes(summary.providerKind)
+  )
+
+  return `
+    <section class="surface upstream-surface">
+      <div class="section-heading">
+        <h2>Upstream Setup</h2>
+        <span>${state.upstreamCatalog.length || 0} supported</span>
+      </div>
+
+      <div class="upstream-grid">
+        <div class="upstream-block">
+          <h3>Local Service</h3>
+          <code>${escapeHtml(local?.serviceOrigin ?? 'Unavailable')}</code>
+          <span>${local?.localKeyConfigured ? 'Local key configured' : 'No local key'}</span>
+          ${state.localKeyPlaintext ? `<input readonly value="${escapeHtml(state.localKeyPlaintext)}" />` : ''}
+          <div class="button-row">
+            <button type="button" data-action="generate-local-key" ${isRuntimeReachable() ? isBusy('generate-local-key') : 'disabled'}>Generate Key</button>
+            <button type="button" data-action="set-local-key" ${isRuntimeReachable() ? isBusy('set-local-key') : 'disabled'}>Set Key</button>
+          </div>
+          <pre>${escapeHtml(local?.snippets.openAiSdk ?? '')}</pre>
+        </div>
+
+        <form id="upstream-api-form" class="upstream-block">
+          <h3>API-Key Upstream</h3>
+          <label>
+            <span>Type</span>
+            <select name="providerKind">
+              ${apiKeyProviderOptions()}
+            </select>
+          </label>
+          <label>
+            <span>Provider Name</span>
+            <input name="providerName" placeholder="OpenAI-compatible only" />
+          </label>
+          <label>
+            <span>Base URL</span>
+            <input name="baseUrl" placeholder="Optional for most providers" />
+          </label>
+          <label>
+            <span>API Key</span>
+            <input name="apiKey" type="password" autocomplete="off" required />
+          </label>
+          <button type="submit" ${isRuntimeReachable() ? isBusy('save-upstream-api') : 'disabled'}>Save Upstream</button>
+        </form>
+
+        <form id="amp-form" class="upstream-block">
+          <h3>Amp</h3>
+          <label>
+            <span>Upstream URL</span>
+            <input name="upstreamUrl" placeholder="https://..." />
+          </label>
+          <label>
+            <span>Upstream Key</span>
+            <input name="upstreamApiKey" type="password" autocomplete="off" />
+          </label>
+          <div class="button-row">
+            <button type="submit" ${isRuntimeReachable() ? isBusy('save-amp') : 'disabled'}>Save Amp</button>
+            <button type="button" data-action="reset-amp" ${isRuntimeReachable() ? isBusy('reset-amp') : 'disabled'}>Reset</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="summary-list">
+        ${apiKeySummaries.map(renderUpstreamSummary).join('')}
+      </div>
+      <div class="summary-list account-list">
+        ${accountSummaries.map(renderAccountSummary).join('')}
+      </div>
+    </section>
+  `
+}
+
+function apiKeyProviderOptions(): string {
+  return ['gemini-api-key', 'codex-api-key', 'claude-api-key', 'vertex-api-key', 'openai-compatibility']
+    .map((kind) => `<option value="${kind}">${escapeHtml(kind)}</option>`)
+    .join('')
+}
+
+function renderUpstreamSummary(summary: UpstreamProviderSummary): string {
+  return `
+    <article class="summary-row">
+      <div>
+        <h3>${escapeHtml(summary.label)}</h3>
+        <span>${summary.configured ? 'configured' : 'empty'}</span>
+      </div>
+    </article>
+  `
+}
+
+function renderAccountSummary(summary: UpstreamProviderSummary): string {
+  const loginAction = loginActionForProvider(summary.providerKind)
+
+  return `
+    <article class="summary-row">
+      <div>
+        <h3>${escapeHtml(summary.label)}</h3>
+        <span>${summary.configured ? 'auth present' : 'no auth file'}</span>
+      </div>
+      ${loginAction ? `<button type="button" data-action="login-provider" data-login-kind="${loginAction}" ${isRuntimeReachable() ? isBusy(`login:${loginAction}`) : 'disabled'}>Login</button>` : ''}
+    </article>
+  `
+}
+
+function loginActionForProvider(providerKind: UpstreamProviderKind): string | null {
+  switch (providerKind) {
+    case 'gemini-cli':
+      return 'gemini-cli-login'
+    case 'antigravity':
+      return 'antigravity-login'
+    case 'claude':
+      return 'claude-login'
+    case 'codex':
+      return 'codex-device-login'
+    case 'kimi':
+      return 'kimi-login'
+    case 'vertex':
+      return 'vertex-import'
+    default:
+      return null
+  }
 }
 
 function renderFeedback(): string {
@@ -168,7 +335,7 @@ function renderManagedRuntimePanel(): string {
   const runtime = state.runtimeState
   const software = runtime?.software
   const managed = runtime?.managed
-  const apiBaseUrl = software?.runtime.apiBaseUrl ?? ''
+  const serviceOrigin = software?.runtime.serviceOrigin ?? ''
   const executablePath = software?.cliproxyapi.localExecutablePath ?? ''
   const releaseMetadataUrl = software?.cliproxyapi.releaseMetadataUrl ?? ''
   const installVersion = managed?.install?.version ?? 'Unknown'
@@ -232,8 +399,8 @@ function renderManagedRuntimePanel(): string {
           <dd>${escapeHtml(installVersion)}</dd>
         </div>
         <div>
-          <dt>API Base</dt>
-          <dd><code>${escapeHtml(apiBaseUrl || 'Unavailable')}</code></dd>
+          <dt>Service Origin</dt>
+          <dd><code>${escapeHtml(serviceOrigin || 'Unavailable')}</code></dd>
         </div>
         <div>
           <dt>Executable</dt>
@@ -248,7 +415,7 @@ function renderManagedRuntimePanel(): string {
       ${managed?.lastError ? renderDiagnostic(managed.lastError) : ''}
       ${renderStatusPanel()}
       <div class="copy-panel">
-        ${renderCopyRow('API Base', apiBaseUrl || null, 'api')}
+        ${renderCopyRow('Service Origin', serviceOrigin || null, 'api')}
       </div>
     </section>
   `
@@ -509,8 +676,62 @@ function bindEventHandlers(): void {
   document
     .querySelector<HTMLFormElement>('#provider-form')
     ?.addEventListener('submit', onProviderSubmit)
+  document
+    .querySelector<HTMLFormElement>('#upstream-api-form')
+    ?.addEventListener('submit', onUpstreamApiSubmit)
+  document
+    .querySelector<HTMLFormElement>('#amp-form')
+    ?.addEventListener('submit', onAmpSubmit)
   document.querySelectorAll<HTMLElement>('[data-action]').forEach((element) => {
     element.addEventListener('click', onActionClick)
+  })
+}
+
+async function onUpstreamApiSubmit(event: SubmitEvent): Promise<void> {
+  event.preventDefault()
+  const form = event.currentTarget
+
+  if (!(form instanceof HTMLFormElement)) {
+    return
+  }
+
+  const data = new FormData(form)
+  const providerKind = stringValue(data.get('providerKind')) as UpstreamProviderKind
+  const apiKey = stringValue(data.get('apiKey')).trim()
+
+  await runAction('save-upstream-api', async () => {
+    await window.allmone.runtime.upsertApiKeyUpstream({
+      providerKind,
+      apiKey,
+      providerName: stringValue(data.get('providerName')).trim() || undefined,
+      baseUrl: stringValue(data.get('baseUrl')).trim() || undefined,
+      apiKeyEntries:
+        providerKind === 'openai-compatibility'
+          ? [{ apiKey }]
+          : undefined
+    })
+    await loadUpstreams()
+    state.notice = 'Upstream saved'
+  })
+}
+
+async function onAmpSubmit(event: SubmitEvent): Promise<void> {
+  event.preventDefault()
+  const form = event.currentTarget
+
+  if (!(form instanceof HTMLFormElement)) {
+    return
+  }
+
+  const data = new FormData(form)
+
+  await runAction('save-amp', async () => {
+    await window.allmone.runtime.writeAmpConfig({
+      upstreamUrl: stringValue(data.get('upstreamUrl')).trim() || undefined,
+      upstreamApiKey: stringValue(data.get('upstreamApiKey')).trim() || undefined
+    })
+    await loadUpstreams()
+    state.notice = 'Amp saved'
   })
 }
 
@@ -653,7 +874,71 @@ function onActionClick(event: Event): void {
       state.selectedProviderName = null
       render()
       break
+    case 'generate-local-key':
+      void generateLocalKey()
+      break
+    case 'set-local-key':
+      void setLocalKey()
+      break
+    case 'reset-amp':
+      void resetAmp()
+      break
+    case 'login-provider':
+      void loginProvider(target.dataset.loginKind ?? '')
+      break
   }
+}
+
+async function generateLocalKey(): Promise<void> {
+  await runAction('generate-local-key', async () => {
+    const result = await window.allmone.runtime.generateLocalApiKey()
+    state.localKeyPlaintext = result.oneTimePlaintextKey ?? null
+    await loadUpstreams()
+    state.notice = 'Local key generated'
+  })
+}
+
+async function setLocalKey(): Promise<void> {
+  const apiKey = window.prompt('Local API key')
+
+  if (!apiKey) {
+    return
+  }
+
+  await runAction('set-local-key', async () => {
+    const result = await window.allmone.runtime.setLocalApiKey(apiKey)
+    state.localKeyPlaintext = result.oneTimePlaintextKey ?? null
+    await loadUpstreams()
+    state.notice = 'Local key saved'
+  })
+}
+
+async function resetAmp(): Promise<void> {
+  await runAction('reset-amp', async () => {
+    await window.allmone.runtime.resetAmpConfig()
+    await loadUpstreams()
+    state.notice = 'Amp reset'
+  })
+}
+
+async function loginProvider(kind: string): Promise<void> {
+  if (!kind) {
+    return
+  }
+
+  const importPath =
+    kind === 'vertex-import'
+      ? window.prompt('Vertex service-account JSON path') ?? undefined
+      : undefined
+
+  await runAction(`login:${kind}`, async () => {
+    await window.allmone.runtime.runLoginAction({
+      kind: kind as never,
+      importPath
+    })
+    await loadUpstreams()
+    state.notice = 'Login handoff finished'
+  })
 }
 
 async function managedCommand(
@@ -776,6 +1061,9 @@ function scheduleManagedStateRefresh(): void {
 
     try {
       state.runtimeState = await window.allmone.runtime.getState()
+      if (state.runtimeState.status === 'reachable') {
+        await loadUpstreams()
+      }
       state.error = null
     } catch (error) {
       state.error = toMessage(error)

@@ -414,6 +414,160 @@ test('deletes OpenAI-compatible providers by name with auth headers', async () =
   assert.deepEqual(result, { ok: true, status: 200, raw: { status: 'ok' } })
 })
 
+test('writes local API keys with documented array route shapes', async () => {
+  const seenRequests: Array<{ url: string; method: string; body?: unknown }> = []
+  const fetch: CliProxyApiFetch = async (input, init) => {
+    seenRequests.push({
+      url: inputToUrl(input),
+      method: init?.method ?? '',
+      body: init?.body ? JSON.parse(String(init.body)) : undefined
+    })
+    return jsonResponse({ status: 'ok' })
+  }
+  const client = createCliProxyApiClient({ fetch })
+
+  await client.putApiKeys(['k1', 'k2'])
+  await client.patchApiKey({ index: 0, value: 'k1b' })
+  await client.deleteApiKey({ value: 'k2' })
+
+  assert.deepEqual(seenRequests, [
+    {
+      url: `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/api-keys`,
+      method: 'PUT',
+      body: ['k1', 'k2']
+    },
+    {
+      url: `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/api-keys`,
+      method: 'PATCH',
+      body: { index: 0, value: 'k1b' }
+    },
+    {
+      url: `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/api-keys?value=k2`,
+      method: 'DELETE',
+      body: undefined
+    }
+  ])
+})
+
+test('reads and writes every API-key upstream section with fake fetch', async () => {
+  const seenRequests: Array<{ url: string; method: string; body?: unknown }> = []
+  const fetch: CliProxyApiFetch = async (input, init) => {
+    const url = new URL(inputToUrl(input))
+    const method = init?.method ?? ''
+    seenRequests.push({
+      url: inputToUrl(input),
+      method,
+      body: init?.body ? JSON.parse(String(init.body)) : undefined
+    })
+
+    if (method === 'GET') {
+      const section = url.pathname.split('/').at(-1) ?? ''
+      return jsonResponse({
+        [section]: [{ 'api-key': `${section}-secret`, 'base-url': 'https://example.com' }]
+      })
+    }
+
+    return jsonResponse({ status: 'ok' })
+  }
+  const client = createCliProxyApiClient({ fetch })
+
+  assert.equal(
+    (await client.getGeminiApiKeyEntries()).entries[0]?.['api-key'],
+    'gemini-api-key-secret'
+  )
+  await client.putCodexApiKeyEntries([{ 'api-key': 'codex-secret' }])
+  await client.patchClaudeApiKeyEntry({
+    match: 'old-secret',
+    value: { 'api-key': 'new-secret' }
+  })
+  await client.deleteVertexApiKeyEntry({ index: 1 })
+
+  assert.equal(
+    seenRequests[0]?.url,
+    `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/gemini-api-key`
+  )
+  assert.deepEqual(seenRequests.slice(1), [
+    {
+      url: `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/codex-api-key`,
+      method: 'PUT',
+      body: [{ 'api-key': 'codex-secret' }]
+    },
+    {
+      url: `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/claude-api-key`,
+      method: 'PATCH',
+      body: { match: 'old-secret', value: { 'api-key': 'new-secret' } }
+    },
+    {
+      url: `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/vertex-api-key?index=1`,
+      method: 'DELETE',
+      body: undefined
+    }
+  ])
+})
+
+test('reads and writes ampcode, oauth controls, and auth file routes', async () => {
+  const seenRequests: Array<{ url: string; method: string; body?: unknown }> = []
+  const fetch: CliProxyApiFetch = async (input, init) => {
+    const url = new URL(inputToUrl(input))
+    const method = init?.method ?? ''
+    seenRequests.push({
+      url: inputToUrl(input),
+      method,
+      body: init?.body ? JSON.parse(String(init.body)) : undefined
+    })
+
+    if (method === 'GET' && url.pathname.endsWith('/ampcode')) {
+      return jsonResponse({ ampcode: { 'upstream-url': 'https://ampcode.com' } })
+    }
+    if (method === 'GET' && url.pathname.endsWith('/oauth-model-alias')) {
+      return jsonResponse({ 'oauth-model-alias': { claude: [] } })
+    }
+    if (method === 'GET' && url.pathname.endsWith('/oauth-excluded-models')) {
+      return jsonResponse({ 'oauth-excluded-models': { claude: ['c1'] } })
+    }
+
+    return jsonResponse({ status: 'ok' })
+  }
+  const client = createCliProxyApiClient({ fetch })
+
+  assert.equal((await client.getAmpCodeConfig()).config['upstream-url'], 'https://ampcode.com')
+  assert.deepEqual(await client.getOauthModelAlias(), {
+    aliases: { claude: [] },
+    raw: { 'oauth-model-alias': { claude: [] } }
+  })
+  assert.deepEqual(await client.getOauthExcludedModels(), {
+    excludedModels: { claude: ['c1'] },
+    raw: { 'oauth-excluded-models': { claude: ['c1'] } }
+  })
+  await client.patchAmpCodeConfig({ 'upstream-api-key': 'amp-secret' })
+  await client.putOauthModelAlias({ codex: [{ name: 'gpt-5', alias: 'g5' }] })
+  await client.patchOauthExcludedModels({ provider: 'claude', models: [] })
+  await client.deleteAuthFile({ name: 'claude.json' })
+
+  assert.deepEqual(seenRequests.slice(3), [
+    {
+      url: `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/ampcode`,
+      method: 'PATCH',
+      body: { 'upstream-api-key': 'amp-secret' }
+    },
+    {
+      url: `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/oauth-model-alias`,
+      method: 'PUT',
+      body: { codex: [{ name: 'gpt-5', alias: 'g5' }] }
+    },
+    {
+      url: `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/oauth-excluded-models`,
+      method: 'PATCH',
+      body: { provider: 'claude', models: [] }
+    },
+    {
+      url: `${CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL}/auth-files?name=claude.json`,
+      method: 'DELETE',
+      body: undefined
+    }
+  ])
+})
+
 test('maps non-2xx write responses to redacted CLIProxyAPI errors', async () => {
   const client = createCliProxyApiClient({
     fetch: async () =>

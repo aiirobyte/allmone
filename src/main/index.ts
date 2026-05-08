@@ -21,6 +21,11 @@ import { resolveRuntimeHome } from './runtime/runtimeHome'
 import { createRuntimeService } from './runtime/service'
 import { createRuntimeSettingsStore } from './runtime/settingsStore'
 import { createTrayController } from './runtime/trayController'
+import { createCliProxyApiClient } from './cli-proxy-api'
+import {
+  createProviderLoginRunner,
+  createUpstreamService
+} from './upstreams'
 
 const isDevelopment = Boolean(process.env.ELECTRON_RENDERER_URL)
 let stopManagedRuntime: (() => Promise<unknown>) | undefined
@@ -126,6 +131,19 @@ app.whenReady().then(async () => {
 
   await allmoneConfigStore.load()
   await runtimeService.initialize()
+  const managementKey = (await settingsStore.ensureManagementKey()).managementKey
+  const upstreamService = createUpstreamService({
+    client: createCliProxyApiClient({
+      baseUrl: runtimeService.getState().connection.baseUrl,
+      timeoutMs: runtimeService.getState().connection.timeoutMs,
+      managementKey
+    })
+  })
+  const providerLoginRunner = createProviderLoginRunner({
+    executablePath: runtimeHome.cliProxyApiExecutablePath,
+    configPath: runtimeHome.runtimeConfigPath,
+    runtimeDir: runtimeHome.runtimeDir
+  })
   const trayController = createTrayController({
     createTray: () => new Tray(createTrayImage()),
     buildMenu: (items) =>
@@ -133,10 +151,10 @@ app.whenReady().then(async () => {
     getState: () => runtimeService.getState(),
     openMainWindow,
     copyApiBase: () => {
-      const apiBaseUrl = runtimeService.getState().software?.runtime.apiBaseUrl
+      const serviceOrigin = runtimeService.getState().software?.runtime.serviceOrigin
 
-      if (apiBaseUrl) {
-        clipboard.writeText(apiBaseUrl)
+      if (serviceOrigin) {
+        clipboard.writeText(serviceOrigin)
       }
     },
     start: () => runtimeService.startManagedRuntime(),
@@ -152,7 +170,13 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('app:get-version', () => app.getVersion())
-  registerRuntimeIpcHandlers({ ipcMain, runtimeService, clipboard })
+  registerRuntimeIpcHandlers({
+    ipcMain,
+    runtimeService,
+    upstreamService,
+    providerLoginRunner,
+    clipboard
+  })
 
   createMainWindow()
 

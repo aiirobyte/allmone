@@ -9,6 +9,18 @@ import type {
   RuntimeProviderWriteResult,
   RuntimeState
 } from '../../main/runtime/types'
+import type {
+  LocalApiKeyState,
+  LocalConnectionOutput,
+  ProviderLoginRunInput,
+  ProviderLoginRunResult,
+  UpstreamAmpConfig,
+  UpstreamApiKeyCredentialInput,
+  UpstreamAuthFileSummary,
+  UpstreamProviderCatalogEntry,
+  UpstreamProviderKind,
+  UpstreamProviderSummary
+} from '../../main/upstreams'
 
 export {}
 
@@ -32,6 +44,26 @@ interface AllmoneRuntimeApi {
   deleteOpenAiCompatibilityProvider: (
     input: CliProxyApiOpenAiCompatibilityDeleteInput
   ) => Promise<RuntimeProviderWriteResult>
+  getUpstreamCatalog: () => Promise<UpstreamProviderCatalogEntry[]>
+  getUpstreamSummaries: () => Promise<UpstreamProviderSummary[]>
+  getLocalConnectionOutput: () => Promise<LocalConnectionOutput>
+  generateLocalApiKey: () => Promise<LocalApiKeyState>
+  setLocalApiKey: (apiKey: string) => Promise<LocalApiKeyState>
+  deleteLocalApiKey: (input: { value: string } | { index: number }) => Promise<unknown>
+  upsertApiKeyUpstream: (
+    input: UpstreamApiKeyCredentialInput
+  ) => Promise<unknown>
+  deleteApiKeyUpstream: (
+    input: { providerKind: UpstreamProviderKind } & (
+      | { apiKey: string }
+      | { index: number }
+    )
+  ) => Promise<unknown>
+  writeAmpConfig: (input: UpstreamAmpConfig) => Promise<unknown>
+  resetAmpConfig: () => Promise<unknown>
+  getAuthFiles: () => Promise<UpstreamAuthFileSummary[]>
+  deleteAuthFile: (input: { name: string } | { all: true }) => Promise<unknown>
+  runLoginAction: (input: ProviderLoginRunInput) => Promise<ProviderLoginRunResult>
 }
 
 declare global {

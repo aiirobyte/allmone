@@ -6,20 +6,19 @@ Specific version prompt plans live under `docs/version/<semver>/prompt_plan.md`.
 
 ## Active Version
 
-Implement v0.1.5 from the version prompt plan:
+Prepare v0.2.0 planning files:
 
 ```text
 Read CLAUDE.md.
 Read docs/todo.md.
-Read docs/version/0.1.5/spec.md.
-Read docs/version/0.1.5/prompt_plan.md.
-Continue from the next unchecked item in docs/version/0.1.5/todo.md.
+Review docs/spec.md and docs/todo.md.
+Create docs/version/0.2.0/spec.md, prompt_plan.md, and todo.md for Auth Management Surface.
 Preserve user changes and keep secrets out of renderer storage.
 ```
 
 Current next prompt:
 
-- Start v0.1.5 Prompt 0: Upstream Catalog And Types.
+- Create v0.2.0 planning files for Auth Management Surface.
 
 ## Operating Rule
 

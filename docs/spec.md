@@ -10,10 +10,10 @@ Project-level planning references:
 
 ## Active Version
 
-Active version: `0.1.5` planned
+Active version: `0.2.0` planned
 
-- Previous version: `docs/version/0.1.4/`
-- Active version docs: `docs/version/0.1.5/`
+- Previous version: `docs/version/0.1.5/`
+- Active version docs: `docs/version/0.2.0/` (not created yet)
 
 ## Product Intent
 
@@ -32,7 +32,7 @@ If a feature would require allmone to parse provider protocols, route API traffi
 - `0.1.2`: Runtime service and minimal config renderer. Complete.
 - `0.1.3`: Runtime connection GUI hardening. Complete.
 - `0.1.4`: Managed CLIProxyAPI runtime, software config, and tray MVP. Complete.
-- `0.1.5`: Real local proxy setup and full CLIProxyAPI upstream catalog. Planned.
+- `0.1.5`: Real local proxy setup and full CLIProxyAPI upstream catalog. Complete.
 - `0.2.0`: Auth management surface. Planned.
 - `0.3.0`: Model-first resource inventory. Planned.
 - `0.4.0`: Usage and logs. Planned.

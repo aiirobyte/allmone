@@ -83,6 +83,7 @@ function managedSoftwareConfig(port = 9444): AllmoneSoftwareConfig {
       port,
       timeoutMs: 5000,
       configPath: '/tmp/allmone/runtime/cli-proxy-api/config.yaml',
+      serviceOrigin: `http://127.0.0.1:${port}`,
       apiBaseUrl: `http://127.0.0.1:${port}/v1`,
       managementBaseUrl: `http://127.0.0.1:${port}/v0/management`
     }
@@ -311,6 +312,10 @@ test('derives the management base URL from managed software config', async () =>
   assert.equal(
     service.getState().connection.baseUrl,
     'http://127.0.0.1:9444/v0/management'
+  )
+  assert.equal(
+    service.getState().software?.runtime.serviceOrigin,
+    'http://127.0.0.1:9444'
   )
   assert.equal(
     service.getState().software?.runtime.apiBaseUrl,

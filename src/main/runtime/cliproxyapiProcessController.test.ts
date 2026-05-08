@@ -66,6 +66,7 @@ function createHarness(options: {
       port: 8317,
       timeoutMs: 5000,
       configPath: runtimeHome.runtimeConfigPath,
+      serviceOrigin: 'http://127.0.0.1:8317',
       apiBaseUrl: 'http://127.0.0.1:8317/v1',
       managementBaseUrl: 'http://127.0.0.1:8317/v0/management'
     }

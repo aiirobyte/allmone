@@ -1,7 +1,7 @@
 # allmone v0.1.5 Todo
 
 Last updated: 2026-05-08
-Status: Planned
+Status: Complete
 
 ## Version Target
 
@@ -13,40 +13,38 @@ Definition of done:
 - [x] Create `docs/version/0.1.5/prompt_plan.md`.
 - [x] Create `docs/version/0.1.5/todo.md`.
 - [x] Finish v0.1.4 before implementation starts.
-- [ ] Add upstream provider catalog for every current CLIProxyAPI upstream family.
-- [ ] Add typed Management API client support for local api-keys.
-- [ ] Add typed Management API client support for Gemini API key upstreams.
-- [ ] Add typed Management API client support for Codex API key upstreams.
-- [ ] Add typed Management API client support for Claude API key upstreams.
-- [ ] Add typed Management API client support for OpenAI-compatible upstreams.
-- [ ] Add typed Management API client support for Vertex API key upstreams.
-- [ ] Add typed Management API client support for Amp integration.
-- [ ] Add typed Management API client support for auth-file summaries and safe auth-file actions.
-- [ ] Add typed Management API client support for OAuth model aliases and excluded models.
-- [ ] Add secret-safe upstream summaries.
-- [ ] Add API-key upstream create/edit/delete flows.
-- [ ] Add local client API key set/generate/delete/copy flow.
-- [ ] Add copyable local API base output.
-- [ ] Add Amp integration UI and service flow.
-- [ ] Add account/OAuth/imported upstream visibility.
-- [ ] Add and use `~/.allmone/runtime/cli-proxy-api/auth` as the managed CLIProxyAPI auth directory.
-- [ ] Add CLIProxyAPI login/import handoffs for supported account-backed upstreams.
-- [ ] Keep secrets out of renderer localStorage/sessionStorage/IndexedDB/logs/DOM data attributes.
-- [ ] Keep allmone free of API proxying, provider adapters, routing, payload rules, and request/response transformation.
-- [ ] Run `bun run test`.
-- [ ] Run `bun run typecheck`.
-- [ ] Run `bun run build`.
-- [ ] Update root docs after implementation completion.
+- [x] Add upstream provider catalog for every current CLIProxyAPI upstream family.
+- [x] Add typed Management API client support for local api-keys.
+- [x] Add typed Management API client support for Gemini API key upstreams.
+- [x] Add typed Management API client support for Codex API key upstreams.
+- [x] Add typed Management API client support for Claude API key upstreams.
+- [x] Add typed Management API client support for OpenAI-compatible upstreams.
+- [x] Add typed Management API client support for Vertex API key upstreams.
+- [x] Add typed Management API client support for Amp integration.
+- [x] Add typed Management API client support for auth-file summaries and safe auth-file actions.
+- [x] Add typed Management API client support for OAuth model aliases and excluded models.
+- [x] Add secret-safe upstream summaries.
+- [x] Add API-key upstream create/edit/delete flows.
+- [x] Add local client API key set/generate/delete/copy flow.
+- [x] Add copyable local API base output.
+- [x] Add Amp integration UI and service flow.
+- [x] Add account/OAuth/imported upstream visibility.
+- [x] Add and use `~/.allmone/runtime/cli-proxy-api/auth` as the managed CLIProxyAPI auth directory.
+- [x] Add CLIProxyAPI login/import handoffs for supported account-backed upstreams.
+- [x] Keep secrets out of renderer localStorage/sessionStorage/IndexedDB/logs/DOM data attributes.
+- [x] Keep allmone free of API proxying, provider adapters, routing, payload rules, and request/response transformation.
+- [x] Run `bun run test`.
+- [x] Run `bun run typecheck`.
+- [x] Run `bun run build`.
+- [x] Update root docs after implementation completion.
 
 ## Next Prompt
 
-Do not start v0.1.5 implementation until v0.1.4 is complete.
+v0.1.5 implementation is complete.
 
-After v0.1.4 completion, start v0.1.5 Prompt 0 from `docs/version/0.1.5/prompt_plan.md`.
+Expected next change:
 
-Expected first change:
-
-- Add the complete provider catalog and upstream types.
+- Start v0.2.0 planning for Auth Management Surface.
 
 ## Guardrails
 
@@ -82,3 +80,6 @@ Expected first change:
 - API-key/configured upstreams in scope: local `api-keys`, `gemini-api-key`, `codex-api-key`, `claude-api-key`, `openai-compatibility`, `vertex-api-key`, and `ampcode`.
 - Account/OAuth/imported upstreams in scope for visibility and login/import handoff: `gemini-cli`, `aistudio`, `antigravity`, `claude`, `codex`, `kimi`, and `vertex`.
 - Older localized docs mention Qwen/iFlow, but current `main` config and command flags checked on 2026-05-08 do not include them as current v0.1.5 catalog entries.
+- 2026-05-08: Prompt 0 completed. Added data-only upstream catalog/types under `src/main/upstreams/`, covering all v0.1.5 provider kinds with section/channel metadata, editable fields, secret fields, redaction notes, and no provider protocol/proxying behavior. Verified with `bun run test` and `bun run typecheck`.
+- 2026-05-08: Prompt 1 completed. Extended `CliProxyApiClient` typed methods for local `api-keys`, Gemini/Codex/Claude/Vertex API-key sections, Amp config, auth-file deletion, OAuth model aliases, and OAuth excluded models. Existing OpenAI-compatible methods remain in place. Verified with `bun run test` and `bun run typecheck`.
+- 2026-05-08: Prompts 2-8 completed. Added `UpstreamService`, API-key CRUD with unknown-field preservation, local API key generation/set/delete and connection output, Amp validation/reset, auth-dir creation, provider login/import runner, upstream IPC/preload bindings, compact renderer upstream setup UI, and final verification. `bun run test`, `bun run typecheck`, and `bun run build` passed. Browser plugin runner was not available through tool discovery, so visual browser verification was not performed.

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import { parse, stringify } from 'yaml'
 
@@ -39,7 +39,6 @@ class FileCliProxyApiConfigWriter implements CliProxyApiConfigWriter {
     config?: AllmoneSoftwareConfig
   ): Promise<AllmoneSoftwareConfig> {
     await ensureRuntimeHome(this.runtimeHome)
-    await mkdir(join(this.runtimeHome.runtimeDir, 'auth'), { recursive: true })
 
     const softwareConfig = config ?? await this.configStore.load()
     const current = await this.readRuntimeConfig()
@@ -113,7 +112,7 @@ function patchManagedRuntimeConfig(
     ...current,
     host: config.runtime.host,
     port: config.runtime.port,
-    'auth-dir': toHomePath(join(runtimeHome.runtimeDir, 'auth'), runtimeHome),
+    'auth-dir': toHomePath(runtimeHome.runtimeAuthDir, runtimeHome),
     'logging-to-file': true,
     'remote-management': {
       ...remoteManagement,

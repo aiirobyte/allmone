@@ -60,6 +60,7 @@ test('creates default non-secret YAML software config under runtime home', async
     assert.equal(config.runtime.port, 8317)
     assert.equal(config.runtime.timeoutMs, 5000)
     assert.equal(config.runtime.configPath, runtimeHome.runtimeConfigPath)
+    assert.equal(config.runtime.serviceOrigin, 'http://127.0.0.1:8317')
     assert.equal(config.runtime.apiBaseUrl, 'http://127.0.0.1:8317/v1')
     assert.equal(
       config.runtime.managementBaseUrl,
@@ -69,6 +70,7 @@ test('creates default non-secret YAML software config under runtime home', async
     assert.equal(parsed.cliproxyapi.runtime.timeoutMs, 5000)
     assert.equal(parsed.cliproxyapi.runtime.configPath, '~/.allmone/runtime/cli-proxy-api/config.yaml')
     assert(!('runtime' in parsed))
+    assert(!('serviceOrigin' in parsed.cliproxyapi.runtime))
     assert(!('apiBaseUrl' in parsed.cliproxyapi.runtime))
     assert(!('managementBaseUrl' in parsed.cliproxyapi.runtime))
     assert(!raw.includes('managementKey'))
@@ -92,7 +94,9 @@ test('normalizes invalid stored ports back to the default port', async () => {
     const parsed = parse(await readFile(runtimeHome.configPath, 'utf8'))
 
     assert.equal(config.runtime.port, 8317)
+    assert.equal(config.runtime.serviceOrigin, 'http://127.0.0.1:8317')
     assert.equal(config.runtime.apiBaseUrl, 'http://127.0.0.1:8317/v1')
+    assert(!('serviceOrigin' in parsed.cliproxyapi.runtime))
     assert(!('apiBaseUrl' in parsed.cliproxyapi.runtime))
     assert(!('managementBaseUrl' in parsed.cliproxyapi.runtime))
     assert.equal(parsed.cliproxyapi.runtime.port, 8317)
@@ -185,6 +189,7 @@ test('keeps software config secret-free when old userData runtime settings exist
     assert.equal(config.runtime.host, '127.0.0.1')
     assert.equal(config.runtime.port, 8317)
     assert.equal(config.runtime.timeoutMs, 5000)
+    assert.equal(config.runtime.serviceOrigin, 'http://127.0.0.1:8317')
     assert.equal(config.runtime.apiBaseUrl, 'http://127.0.0.1:8317/v1')
     assert.equal(
       config.runtime.managementBaseUrl,

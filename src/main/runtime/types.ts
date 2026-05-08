@@ -15,6 +15,7 @@ export interface RuntimeSoftwareConfigSummary {
     port: number
     timeoutMs: number
     configPath: string
+    serviceOrigin: string
     apiBaseUrl: string
     managementBaseUrl: string
   }
