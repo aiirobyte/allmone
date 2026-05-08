@@ -10,14 +10,14 @@ Read CLAUDE.md and docs/todo.md, then continue with the active version's next un
 
 ## Active Version
 
-Active version: `0.1.6` planned
+Active version: `0.2.0` planned
 
-- Previous version: `docs/version/0.1.5/`
-- Active version docs: `docs/version/0.1.6/`
+- Previous version: `docs/version/0.1.6/`
+- Active version docs: `docs/version/0.2.0/` (not created yet)
 
 ## Current Target
 
-Target: v0.1.6 React Renderer And Sidebar Navigation.
+Target: v0.2.0 Auth Management Surface.
 
 Definition of done:
 
@@ -45,22 +45,25 @@ Definition of done:
 - [x] Create `docs/version/0.1.6/spec.md`.
 - [x] Create `docs/version/0.1.6/prompt_plan.md`.
 - [x] Create `docs/version/0.1.6/todo.md`.
-- [ ] Add React and React DOM dependencies.
-- [ ] Change renderer entry point to `src/renderer/src/main.tsx`.
-- [ ] Add sidebar navigation with `Allmone`, `Providers`, and `Settings`.
-- [ ] Move Upstream Setup into `Providers`.
-- [ ] Move Managed CLIProxyAPI into `Settings`.
-- [ ] Remove the duplicate standalone `OpenAI-Compatible Providers` module.
-- [ ] Run `bun run typecheck`.
-- [ ] Run `bun run build`.
+- [x] Add React and React DOM dependencies.
+- [x] Change renderer entry point to `src/renderer/src/main.tsx`.
+- [x] Add sidebar navigation with `Allmone`, `Providers`, and `Settings`.
+- [x] Move Upstream Setup into `Providers`.
+- [x] Move Managed CLIProxyAPI into `Settings`.
+- [x] Remove the duplicate standalone `OpenAI-Compatible Providers` module.
+- [x] Run `bun run typecheck`.
+- [x] Run `bun run build`.
+- [ ] Create `docs/version/0.2.0/spec.md`.
+- [ ] Create `docs/version/0.2.0/prompt_plan.md`.
+- [ ] Create `docs/version/0.2.0/todo.md`.
 
 ## Next Prompt
 
-Start v0.1.6 React renderer foundation.
+Create v0.2.0 planning files.
 
 Expected next change:
 
-- Add React renderer foundation from `docs/version/0.1.6/prompt_plan.md` Prompt 0 without changing main-process runtime or upstream behavior.
+- Plan Auth Management Surface around CLIProxyAPI Management API without moving token contents into renderer state.
 
 ## Version Roadmap
 
@@ -70,7 +73,7 @@ Expected next change:
 - [x] v0.1.3 Runtime Connection GUI Hardening: diagnostics, endpoint copy, empty states, and editing affordances.
 - [x] v0.1.4 Managed CLIProxyAPI Runtime, Software Config, And Tray MVP: YAML config, official download/update, process control, port ownership, tray status, and quick actions.
 - [x] v0.1.5 Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog: configure local client keys and every current CLIProxyAPI upstream family.
-- [ ] v0.1.6 React Renderer And Sidebar Navigation: migrate renderer to React, add Providers/Settings sidebar, and remove duplicate OpenAI-compatible provider surface.
+- [x] v0.1.6 React Renderer And Sidebar Navigation: migrate renderer to React, add Providers/Settings sidebar, and remove duplicate OpenAI-compatible provider surface.
 - [ ] v0.2.0 Auth Management Surface: API/auth resources through CLIProxyAPI.
 - [ ] v0.3.0 Model Resource Inventory: model-first inventory with backing provider/auth details.
 - [ ] v0.4.0 Usage And Logs: request log, usage, queue, and error visibility.
@@ -103,4 +106,6 @@ Expected next change:
 - 2026-05-08: v0.1.5 Prompt 1 completed with typed CLIProxyAPI Management API client upstream route methods and fake-fetch tests; next prompt is UpstreamService and redaction.
 - 2026-05-08: v0.1.5 completed. Added full upstream catalog/types, typed Management API client routes, `UpstreamService`, API-key CRUD, local client key flow, Amp flow, auth-file summaries, managed auth-dir, provider login/import runner, upstream IPC/preload, compact renderer setup UI, and verification (`bun run test`, `bun run typecheck`, `bun run build`). Browser visual verification could not run because the Browser Node runner was not available through tool discovery.
 - 2026-05-09: User inserted v0.1.6 before v0.2.0 for React renderer migration and sidebar navigation. Created `docs/version/0.1.6/` planning files and chose the lightweight page-state React approach.
+- 2026-05-09: v0.1.6 Prompt 0 completed with React dependencies, TSX renderer entry, minimal `App` shell, a red/green renderer shell test, and `bun run typecheck`.
+- 2026-05-09: v0.1.6 completed. Migrated renderer to React, split app state/types/shared UI/Providers/Settings surfaces, added sidebar navigation, removed the duplicate standalone OpenAI-compatible provider module, preserved main-process IPC contracts, and verified with `bun run test`, `bun run typecheck`, and `bun run build`.
 - Update this file and the active version todo after every meaningful coding session.
