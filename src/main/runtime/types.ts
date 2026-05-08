@@ -86,3 +86,36 @@ export interface RuntimeProviderWriteResult {
   status: number
   summary: RuntimeConfigSummary
 }
+
+export type RuntimeOutputTestState =
+  | CliProxyApiManagementState
+  | 'invalid_config'
+
+export interface RuntimeOutputPortConnectivityResult {
+  ok: boolean
+  state: RuntimeOutputTestState
+  target: string
+  host?: string
+  port?: number
+  latencyMs?: number
+  checkedAt: string
+  error?: string
+}
+
+export interface RuntimeModelOutputTestInput {
+  model: string
+  apiKey: string
+  prompt?: string
+}
+
+export interface RuntimeModelOutputTestResult {
+  ok: boolean
+  state: RuntimeOutputTestState
+  target: string
+  model: string
+  status?: number
+  latencyMs?: number
+  outputText?: string
+  checkedAt: string
+  error?: string
+}

@@ -159,6 +159,7 @@ export interface UpstreamAmpConfig {
 
 export interface UpstreamAuthFileSummary {
   id?: string
+  name?: string
   authIndex?: string
   providerKind: UpstreamProviderKind
   label?: string

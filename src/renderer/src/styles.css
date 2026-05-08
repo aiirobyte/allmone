@@ -287,6 +287,55 @@ h3 {
   padding: 10px;
 }
 
+.account-summary-row,
+.provider-summary-row {
+  display: grid;
+  align-items: stretch;
+}
+
+.account-summary-header,
+.auth-file-row,
+.provider-summary-header,
+.provider-entry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.auth-file-list,
+.provider-entry-list {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-file-row,
+.provider-entry-row {
+  border-top: 1px solid #eef2f6;
+  padding-top: 8px;
+}
+
+.auth-file-row div,
+.provider-entry-row div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.auth-file-row strong,
+.provider-entry-row strong {
+  color: #17212b;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.auth-file-row button,
+.provider-entry-row button {
+  min-width: 72px;
+  padding: 0 10px;
+}
+
 .summary-row span,
 .upstream-block span {
   color: #667085;
@@ -426,6 +475,81 @@ label {
   color: #111827;
   font-weight: 800;
   overflow-wrap: anywhere;
+}
+
+.output-test-panel {
+  border: 1px solid #dfe5ed;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.output-test-panel h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 1rem;
+}
+
+.output-test-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.output-test-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.compact-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.wide-field {
+  grid-column: 1 / -1;
+}
+
+.output-test-result {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.output-test-result div {
+  min-width: 0;
+}
+
+.output-test-result .wide-detail {
+  grid-column: 1 / -1;
+}
+
+.output-test-result dt {
+  color: #6b7280;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.output-test-result dd {
+  margin: 3px 0 0;
+  color: #111827;
+  font-size: 0.82rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  margin: 0;
+  color: #687386;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .status-grid {
@@ -681,6 +805,10 @@ code {
   .managed-detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .output-test-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 620px) {
@@ -704,6 +832,10 @@ code {
 
   .topbar,
   .section-heading,
+  .account-summary-header,
+  .auth-file-row,
+  .provider-summary-header,
+  .provider-entry-row,
   .provider-row {
     align-items: stretch;
     flex-direction: column;
@@ -715,6 +847,8 @@ code {
   }
 
   .form-grid,
+  .compact-form-grid,
+  .output-test-result,
   .status-grid,
   .copy-row,
   .model-row,

@@ -1,9 +1,17 @@
 import type { FormEvent, ReactElement } from 'react'
 
-import type { RuntimeState } from '../../../main/runtime/types'
+import type {
+  RuntimeModelOutputTestResult,
+  RuntimeOutputPortConnectivityResult,
+  RuntimeState
+} from '../../../main/runtime/types'
 import { CopyRow } from '../components/CopyRow'
 import { Diagnostic, RuntimeStatusPanel } from '../components/Status'
-import type { SafeEndpointKind, ViewState } from '../rendererTypes'
+import type {
+  ModelOutputTestFormInput,
+  SafeEndpointKind,
+  ViewState
+} from '../rendererTypes'
 import {
   canStartManagedRuntime,
   isActionBusy,
@@ -15,6 +23,8 @@ type SettingsPageProps = {
   state: ViewState
   onSaveOutputPort: (port: number) => void
   onTestConnection: () => void
+  onTestOutputPortConnectivity: () => void
+  onTestModelOutput: (input: ModelOutputTestFormInput) => void
   onInstallUpdate: () => void
   onCheckUpdate: () => void
   onStartRuntime: () => void
@@ -27,6 +37,8 @@ export function SettingsPage({
   state,
   onSaveOutputPort,
   onTestConnection,
+  onTestOutputPortConnectivity,
+  onTestModelOutput,
   onInstallUpdate,
   onCheckUpdate,
   onStartRuntime,
@@ -123,6 +135,11 @@ export function SettingsPage({
       </div>
 
       {managed?.lastError ? <Diagnostic message={managed.lastError} /> : null}
+      <OutputPortTests
+        state={state}
+        onTestOutputPortConnectivity={onTestOutputPortConnectivity}
+        onTestModelOutput={onTestModelOutput}
+      />
       <RuntimeStatusPanel
         runtimeState={state.runtimeState}
         configSummary={state.configSummary}
@@ -137,6 +154,168 @@ export function SettingsPage({
         />
       </div>
     </section>
+  )
+}
+
+function OutputPortTests({
+  state,
+  onTestOutputPortConnectivity,
+  onTestModelOutput
+}: {
+  state: ViewState
+  onTestOutputPortConnectivity: () => void
+  onTestModelOutput: (input: ModelOutputTestFormInput) => void
+}): ReactElement {
+  function handleModelSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault()
+
+    const data = new FormData(event.currentTarget)
+    onTestModelOutput({
+      model: stringField(data.get('model')),
+      apiKey: stringField(data.get('apiKey')),
+      prompt: stringField(data.get('prompt')) || undefined
+    })
+  }
+
+  return (
+    <div className="output-test-panel">
+      <div className="section-heading">
+        <h3>Output Port Tests</h3>
+        <span>{state.outputPortTest?.state ?? 'idle'}</span>
+      </div>
+      <div className="output-test-grid">
+        <div className="output-test-card">
+          <button
+            type="button"
+            disabled={isActionBusy(state.busyAction, 'test-output-port')}
+            aria-busy={
+              isActionBusy(state.busyAction, 'test-output-port') || undefined
+            }
+            onClick={onTestOutputPortConnectivity}
+          >
+            Test Port
+          </button>
+          <ConnectivityResult result={state.outputPortTest} />
+        </div>
+
+        <form className="output-test-card" onSubmit={handleModelSubmit}>
+          <div className="compact-form-grid">
+            <label>
+              <span>Model</span>
+              <input name="model" placeholder="model alias" required />
+            </label>
+            <label>
+              <span>Local API Key</span>
+              <input
+                name="apiKey"
+                type="password"
+                placeholder="ak-..."
+                autoComplete="off"
+                required
+              />
+            </label>
+            <label className="wide-field">
+              <span>Prompt</span>
+              <input name="prompt" placeholder="Reply with OK." />
+            </label>
+          </div>
+          <button
+            type="submit"
+            disabled={isActionBusy(state.busyAction, 'test-model-output')}
+            aria-busy={
+              isActionBusy(state.busyAction, 'test-model-output') || undefined
+            }
+          >
+            Run Model
+          </button>
+          <ModelOutputResult result={state.modelOutputTest} />
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ConnectivityResult({
+  result
+}: {
+  result: RuntimeOutputPortConnectivityResult | null
+}): ReactElement {
+  if (!result) {
+    return <p className="muted">Not tested</p>
+  }
+
+  return (
+    <dl className="output-test-result">
+      <div>
+        <dt>Status</dt>
+        <dd>{result.state}</dd>
+      </div>
+      <div>
+        <dt>Target</dt>
+        <dd>
+          <code>{result.target}</code>
+        </dd>
+      </div>
+      <div>
+        <dt>Latency</dt>
+        <dd>{formatLatency(result.latencyMs)}</dd>
+      </div>
+      {result.error ? (
+        <div className="wide-detail">
+          <dt>Error</dt>
+          <dd>{result.error}</dd>
+        </div>
+      ) : null}
+    </dl>
+  )
+}
+
+function ModelOutputResult({
+  result
+}: {
+  result: RuntimeModelOutputTestResult | null
+}): ReactElement {
+  if (!result) {
+    return <p className="muted">Not tested</p>
+  }
+
+  return (
+    <dl className="output-test-result">
+      <div>
+        <dt>Status</dt>
+        <dd>{result.state}</dd>
+      </div>
+      <div>
+        <dt>Model</dt>
+        <dd>{result.model}</dd>
+      </div>
+      <div>
+        <dt>HTTP</dt>
+        <dd>{result.status ?? 'None'}</dd>
+      </div>
+      <div>
+        <dt>Latency</dt>
+        <dd>{formatLatency(result.latencyMs)}</dd>
+      </div>
+      <div className="wide-detail">
+        <dt>Target</dt>
+        <dd>
+          <code>{result.target}</code>
+        </dd>
+      </div>
+      {result.outputText ? (
+        <div className="wide-detail">
+          <dt>Output</dt>
+          <dd>{result.outputText}</dd>
+        </div>
+      ) : null}
+      {result.error ? (
+        <div className="wide-detail">
+          <dt>Error</dt>
+          <dd>{result.error}</dd>
+        </div>
+      ) : null}
+    </dl>
   )
 }
 
@@ -239,4 +418,12 @@ function ActionButton({
       {children}
     </button>
   )
+}
+
+function stringField(value: FormDataEntryValue | null): string {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function formatLatency(value: number | undefined): string {
+  return typeof value === 'number' ? `${value} ms` : 'Unknown'
 }

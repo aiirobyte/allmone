@@ -13,6 +13,7 @@ import type {
   ActiveSection,
   AmpFormInput,
   ConfigLoadResult,
+  ModelOutputTestFormInput,
   SafeEndpointKind,
   UpstreamApiFormInput,
   ViewState
@@ -232,6 +233,27 @@ export function App({
     })
   }
 
+  function deleteApiKeyUpstream(
+    providerKind: UpstreamApiFormInput['providerKind'],
+    index: number
+  ): void {
+    if (!window.confirm('Delete this provider entry?')) {
+      return
+    }
+
+    void runAction(`delete-upstream-api:${providerKind}:${index}`, async () => {
+      await window.allmone.runtime.deleteApiKeyUpstream({
+        providerKind,
+        index
+      })
+
+      return {
+        ...(await loadUpstreams()),
+        notice: 'Provider entry deleted'
+      }
+    })
+  }
+
   function saveAmp(input: AmpFormInput): void {
     void runAction('save-amp', async () => {
       await window.allmone.runtime.writeAmpConfig(input)
@@ -281,6 +303,28 @@ export function App({
       }
 
       return patch
+    })
+  }
+
+  function testOutputPortConnectivity(): void {
+    void runAction('test-output-port', async () => {
+      const result = await window.allmone.runtime.testOutputPortConnectivity()
+
+      return {
+        outputPortTest: result,
+        notice: `Output port ${result.state}`
+      }
+    })
+  }
+
+  function testModelOutput(input: ModelOutputTestFormInput): void {
+    void runAction('test-model-output', async () => {
+      const result = await window.allmone.runtime.testModelOutput(input)
+
+      return {
+        modelOutputTest: result,
+        notice: result.ok ? 'Model output received' : `Model output ${result.state}`
+      }
     })
   }
 
@@ -384,6 +428,21 @@ export function App({
     })
   }
 
+  function deleteAuthFile(name: string): void {
+    if (!window.confirm('Delete this auth file?')) {
+      return
+    }
+
+    void runAction(`delete-auth-file:${name}`, async () => {
+      await window.allmone.runtime.deleteAuthFile({ name })
+
+      return {
+        ...(await loadUpstreams()),
+        notice: 'Auth file deleted'
+      }
+    })
+  }
+
   function copyEndpoint(kind: SafeEndpointKind): void {
     void runAction(`copy:${kind}`, async () => {
       const result = await window.allmone.runtime.copyApiBase()
@@ -423,12 +482,16 @@ export function App({
             onSaveAmp={saveAmp}
             onResetAmp={resetAmp}
             onLoginProvider={loginProvider}
+            onDeleteApiKeyUpstream={deleteApiKeyUpstream}
+            onDeleteAuthFile={deleteAuthFile}
           />
         ) : (
           <SettingsPage
             state={state}
             onSaveOutputPort={saveOutputPort}
             onTestConnection={testConnection}
+            onTestOutputPortConnectivity={testOutputPortConnectivity}
+            onTestModelOutput={testModelOutput}
             onInstallUpdate={installUpdate}
             onCheckUpdate={() =>
               managedCommand(

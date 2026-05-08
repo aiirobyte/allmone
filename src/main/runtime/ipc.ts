@@ -1,6 +1,7 @@
 import type { RuntimeService } from './service'
 import type {
   RuntimeConnectionSettingsInput,
+  RuntimeModelOutputTestInput,
   RuntimeOpenAiProviderInput
 } from './types'
 import type { CliProxyApiOpenAiCompatibilityDeleteInput } from '../cli-proxy-api'
@@ -20,6 +21,8 @@ export const RUNTIME_IPC_CHANNELS = {
   getState: 'runtime:get-state',
   saveConnection: 'runtime:save-connection',
   testConnection: 'runtime:test-connection',
+  testOutputPortConnectivity: 'runtime:test-output-port-connectivity',
+  testModelOutput: 'runtime:test-model-output',
   getConfigSummary: 'runtime:get-config-summary',
   saveOutputPort: 'runtime:save-output-port',
   ensureInstalledThenStart: 'runtime:ensure-installed-then-start',
@@ -77,6 +80,13 @@ export function registerRuntimeIpcHandlers(options: RuntimeIpcOptions): void {
   )
   ipcMain.handle(RUNTIME_IPC_CHANNELS.testConnection, () =>
     runtimeService.testConnection()
+  )
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.testOutputPortConnectivity, (_event, payload) => {
+    validateNoPayload(payload)
+    return runtimeService.testOutputPortConnectivity()
+  })
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.testModelOutput, (_event, payload) =>
+    runtimeService.testModelOutput(validateModelOutputPayload(payload))
   )
   ipcMain.handle(RUNTIME_IPC_CHANNELS.getConfigSummary, () =>
     runtimeService.getConfigSummary()
@@ -257,6 +267,29 @@ function validateConnectionPayload(
   }
 
   return input
+}
+
+function validateModelOutputPayload(value: unknown): RuntimeModelOutputTestInput {
+  assertRecord(value)
+
+  if (typeof value.model !== 'string' || typeof value.apiKey !== 'string') {
+    throwInvalidPayload()
+  }
+
+  assertOptionalString(value.prompt)
+
+  const model = value.model.trim()
+  const apiKey = value.apiKey.trim()
+
+  if (!model || !apiKey) {
+    throwInvalidPayload()
+  }
+
+  return {
+    model,
+    apiKey,
+    prompt: typeof value.prompt === 'string' ? value.prompt : undefined
+  }
 }
 
 function validateProviderPayload(value: unknown): RuntimeOpenAiProviderInput {

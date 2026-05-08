@@ -110,6 +110,30 @@ function createFakeService(): RuntimeService & {
     async testConnection() {
       return { ok: true, state: 'reachable', status: 200 }
     },
+    async testOutputPortConnectivity() {
+      return {
+        ok: true,
+        state: 'reachable',
+        target: 'http://127.0.0.1:8317',
+        host: '127.0.0.1',
+        port: 8317,
+        latencyMs: 3,
+        checkedAt: '2026-05-09T00:00:00.000Z'
+      }
+    },
+    async testModelOutput(input) {
+      this.providerPayloads.push(input)
+      return {
+        ok: true,
+        state: 'reachable',
+        target: 'http://127.0.0.1:8317/v1/chat/completions',
+        model: input.model,
+        status: 200,
+        latencyMs: 8,
+        outputText: 'ok',
+        checkedAt: '2026-05-09T00:00:00.000Z'
+      }
+    },
     async getConfigSummary() {
       return {
         apiKeysConfigured: 0,
@@ -357,6 +381,44 @@ test('validates managed runtime port and command IPC payloads', async () => {
     'restartManagedRuntime',
     'stopManagedRuntime'
   ])
+})
+
+test('validates output port test IPC payloads without echoing local keys', async () => {
+  const ipc = createFakeIpcMain()
+  const service = createFakeService()
+  registerRuntimeIpcHandlers({ ipcMain: ipc.ipcMain, runtimeService: service })
+
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.testOutputPortConnectivity)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.testModelOutput, {
+    model: 'test-model',
+    apiKey: 'local-secret',
+    prompt: 'say ok'
+  })
+
+  await assert.rejects(
+    async () => {
+      await ipc.invoke(RUNTIME_IPC_CHANNELS.testModelOutput, {
+        model: 'test-model',
+        apiKey: 'local-secret',
+        prompt: 123
+      })
+    },
+    (error) =>
+      error instanceof Error &&
+      error.message === 'Invalid runtime IPC payload' &&
+      !error.message.includes('local-secret')
+  )
+  await assert.rejects(async () => {
+    await ipc.invoke(RUNTIME_IPC_CHANNELS.testOutputPortConnectivity, {
+      apiKey: 'local-secret'
+    })
+  })
+
+  assert.deepEqual(service.providerPayloads[0], {
+    model: 'test-model',
+    apiKey: 'local-secret',
+    prompt: 'say ok'
+  })
 })
 
 test('copies only the safe local service origin through main clipboard', async () => {

@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 
-import { CliProxyApiError } from '../cli-proxy-api'
+import {
+  CliProxyApiError,
+  type CliProxyApiUpstreamApiKeyEntry
+} from '../cli-proxy-api'
 import {
   UPSTREAM_PROVIDER_KINDS,
   createUpstreamService,
@@ -247,6 +250,96 @@ test('summarizes every upstream family without leaking secrets', async () => {
   }
 })
 
+test('returns multiple auth-file summaries with delete names and redacted metadata', async () => {
+  const service = createUpstreamService({
+    client: createFakeClient({
+      async getAuthFiles() {
+        return {
+          files: [
+            {
+              name: 'codex-work.json',
+              auth_index: 'codex-work',
+              provider: 'codex',
+              label: 'Work Codex',
+              path: '/Users/me/.allmone/runtime/cli-proxy-api/auth/codex-work.json',
+              status: 'ok',
+              source: 'file',
+              disabled: false
+            },
+            {
+              name: 'codex-personal.json',
+              provider: 'codex',
+              account: 'personal@example.com',
+              status: 'expired',
+              status_message: 'Authorization: Bearer codex-token-secret expired',
+              source: 'file',
+              disabled: true
+            },
+            {
+              name: 'claude-work.json',
+              provider: 'claude',
+              email: 'claude-work@example.com',
+              path: '/Users/me/.allmone/runtime/cli-proxy-api/auth/claude-work.json',
+              status: 'ok'
+            }
+          ],
+          raw: {}
+        }
+      }
+    })
+  })
+
+  const result = await service.getAuthFileSummaries()
+  const serialized = JSON.stringify(result)
+
+  assert.deepEqual(
+    result.map((file) => ({
+      name: file.name,
+      authIndex: file.authIndex,
+      providerKind: file.providerKind,
+      label: file.label,
+      status: file.status,
+      source: file.source,
+      disabled: file.disabled,
+      redactedPath: file.redactedPath
+    })),
+    [
+      {
+        name: 'codex-work.json',
+        authIndex: 'codex-work',
+        providerKind: 'codex',
+        label: 'Work Codex',
+        status: 'ok',
+        source: 'file',
+        disabled: false,
+        redactedPath: '[REDACTED_PATH]/codex-work.json'
+      },
+      {
+        name: 'codex-personal.json',
+        authIndex: undefined,
+        providerKind: 'codex',
+        label: 'personal@example.com',
+        status: 'expired',
+        source: 'file',
+        disabled: true,
+        redactedPath: undefined
+      },
+      {
+        name: 'claude-work.json',
+        authIndex: undefined,
+        providerKind: 'claude',
+        label: 'claude-work@example.com',
+        status: 'ok',
+        source: undefined,
+        disabled: undefined,
+        redactedPath: '[REDACTED_PATH]/claude-work.json'
+      }
+    ]
+  )
+  assert(!serialized.includes('/Users/me/.allmone/runtime'))
+  assert(!serialized.includes('codex-token-secret'))
+})
+
 test('maps API-key upstream writes and deletes by provider kind', async () => {
   const calls: string[] = []
   const client = createFakeClient({
@@ -400,6 +493,146 @@ test('creates API-key upstream entries by appending to each current provider lis
   assert.deepEqual(written.codex?.at(-1), { 'api-key': 'new-codex' })
   assert.deepEqual(written.claude?.at(-1), { 'api-key': 'new-claude' })
   assert.deepEqual(written.vertex?.at(-1), { 'api-key': 'new-vertex' })
+})
+
+test('deletes provider entries by index without touching unrelated providers', async () => {
+  let geminiEntries = [
+    { 'api-key': 'gemini-one' },
+    { 'api-key': 'gemini-two' }
+  ]
+  let codexEntries = [{ 'api-key': 'codex-one' }]
+  let openAiProviders = [
+    { name: 'openrouter', 'base-url': 'https://openrouter.ai/api/v1' },
+    { name: 'custom-openai', 'base-url': 'https://custom.example.com/v1' }
+  ]
+  const service = createUpstreamService({
+    client: createFakeClient({
+      async getGeminiApiKeyEntries() {
+        return { entries: geminiEntries, raw: {} }
+      },
+      async getCodexApiKeyEntries() {
+        return { entries: codexEntries, raw: {} }
+      },
+      async getOpenAiCompatibilityProviders() {
+        return { providers: openAiProviders, raw: {} }
+      },
+      async deleteGeminiApiKeyEntry(input) {
+        geminiEntries = geminiEntries.filter((_, index) =>
+          'index' in input ? index !== input.index : true
+        )
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      },
+      async deleteOpenAiCompatibilityProvider(input) {
+        openAiProviders = openAiProviders.filter((provider, index) =>
+          'index' in input ? index !== input.index : provider.name !== input.name
+        )
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      }
+    })
+  })
+
+  await service.deleteApiKeyUpstream('gemini-api-key', { index: 1 })
+  await service.deleteApiKeyUpstream('openai-compatibility', { index: 0 })
+
+  assert.deepEqual(geminiEntries, [{ 'api-key': 'gemini-one' }])
+  assert.deepEqual(codexEntries, [{ 'api-key': 'codex-one' }])
+  assert.deepEqual(openAiProviders, [
+    { name: 'custom-openai', 'base-url': 'https://custom.example.com/v1' }
+  ])
+})
+
+test('reloads provider and auth summaries from current persisted client state', async () => {
+  let geminiEntries: CliProxyApiUpstreamApiKeyEntry[] = [
+    { 'api-key': 'persisted-gemini-one' }
+  ]
+  let codexEntries: CliProxyApiUpstreamApiKeyEntry[] = [
+    { 'api-key': 'persisted-codex-one' }
+  ]
+  let authFiles = [
+    {
+      name: 'codex-work.json',
+      provider: 'codex',
+      label: 'Codex Work',
+      path: '/Users/me/.allmone/runtime/cli-proxy-api/auth/codex-work.json',
+      status: 'ok'
+    },
+    {
+      name: 'claude-work.json',
+      provider: 'claude',
+      label: 'Claude Work',
+      status: 'ok'
+    }
+  ]
+  const client = createFakeClient({
+    async getGeminiApiKeyEntries() {
+      return { entries: geminiEntries, raw: {} }
+    },
+    async putGeminiApiKeyEntries(entries) {
+      geminiEntries = entries
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async getCodexApiKeyEntries() {
+      return { entries: codexEntries, raw: {} }
+    },
+    async deleteCodexApiKeyEntry(input) {
+      codexEntries = codexEntries.filter((entry, index) =>
+        'index' in input ? index !== input.index : entry['api-key'] !== input.apiKey
+      )
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async getAuthFiles() {
+      return { files: authFiles, raw: {} }
+    },
+    async deleteAuthFile(input) {
+      authFiles = authFiles.filter((file) =>
+        'name' in input ? file.name !== input.name : false
+      )
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    }
+  })
+
+  const firstService = createUpstreamService({ client })
+  await firstService.upsertApiKeyUpstream({
+    providerKind: 'gemini-api-key',
+    apiKey: 'persisted-gemini-two'
+  })
+  authFiles = [
+    ...authFiles,
+    {
+      name: 'codex-personal.json',
+      provider: 'codex',
+      label: 'Codex Personal',
+      status: 'ok'
+    }
+  ]
+  await firstService.deleteApiKeyUpstream('codex-api-key', { index: 0 })
+  await firstService.deleteAuthFile({ name: 'codex-work.json' })
+
+  const reloadedService = createUpstreamService({ client })
+  const [summaries, reloadedAuthFiles] = await Promise.all([
+    reloadedService.getUpstreamSummaries(),
+    reloadedService.getAuthFileSummaries()
+  ])
+  const geminiSummary = summaries.find(
+    (summary) => summary.providerKind === 'gemini-api-key'
+  )
+  const codexApiKeySummary = summaries.find(
+    (summary) => summary.providerKind === 'codex-api-key'
+  )
+  const codexAccountSummary = summaries.find(
+    (summary) => summary.providerKind === 'codex'
+  )
+
+  assert.equal(geminiSummary?.configured, true)
+  assert.equal(geminiSummary?.entries?.length, 2)
+  assert.equal(codexApiKeySummary?.configured, false)
+  assert.equal(codexAccountSummary?.configured, true)
+  assert.deepEqual(
+    reloadedAuthFiles.map((file) => file.name),
+    ['claude-work.json', 'codex-personal.json']
+  )
+  assert(!JSON.stringify(summaries).includes('persisted-gemini-two'))
+  assert(!JSON.stringify(reloadedAuthFiles).includes('/Users/me/.allmone/runtime'))
 })
 
 test('edits API-key upstream entries by index and preserves unknown fields', async () => {

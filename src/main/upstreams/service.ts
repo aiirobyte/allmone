@@ -375,9 +375,10 @@ class DefaultUpstreamService implements UpstreamService {
       const result = await this.client.getAuthFiles()
       return result.files.map((file) => ({
         id: stringValue(file.id),
+        name: stringValue(file.name),
         authIndex: stringValue(file.auth_index),
         providerKind: toProviderKind(file.provider),
-        label: stringValue(file.label ?? file.name ?? file.email ?? file.account),
+        label: stringValue(file.label ?? file.email ?? file.account ?? file.name),
         status: stringValue(file.status),
         disabled: typeof file.disabled === 'boolean' ? file.disabled : undefined,
         source: stringValue(file.source),

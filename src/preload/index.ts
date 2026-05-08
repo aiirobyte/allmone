@@ -4,6 +4,7 @@ import { RUNTIME_IPC_CHANNELS, RUNTIME_IPC_EVENTS } from '../main/runtime/ipc'
 import type { CliProxyApiOpenAiCompatibilityDeleteInput } from '../main/cli-proxy-api'
 import type {
   RuntimeConnectionSettingsInput,
+  RuntimeModelOutputTestInput,
   RuntimeOpenAiProviderInput
 } from '../main/runtime/types'
 import type {
@@ -28,6 +29,10 @@ contextBridge.exposeInMainWorld('allmone', {
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.saveConnection, input),
     testConnection: () =>
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.testConnection),
+    testOutputPortConnectivity: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.testOutputPortConnectivity),
+    testModelOutput: (input: RuntimeModelOutputTestInput) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.testModelOutput, input),
     getConfigSummary: () =>
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.getConfigSummary),
     saveOutputPort: (port: number) =>

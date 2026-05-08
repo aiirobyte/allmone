@@ -70,6 +70,14 @@ function createFakeClient(
   }
 }
 
+function outputJsonResponse(value: unknown, status = 200): Response {
+  return new Response(JSON.stringify(value), {
+    status,
+    statusText: status === 200 ? 'OK' : 'Error',
+    headers: { 'content-type': 'application/json' }
+  })
+}
+
 function managedSoftwareConfig(port = 9444): AllmoneSoftwareConfig {
   return {
     version: 1,
@@ -443,6 +451,88 @@ test('routes managed process commands through the process controller', async () 
   ])
   assert.equal(service.getState().managed?.status, 'ready')
   assert.equal(service.getState().software?.runtime.port, 8317)
+})
+
+test('tests the configured CLIProxyAPI output port without management credentials', async () => {
+  const store = createFakeStore(loadedSettings())
+  const connectionAttempts: Array<{
+    host: string
+    port: number
+    timeoutMs: number
+  }> = []
+  const service = createRuntimeService({
+    settingsStore: store,
+    allmoneConfigStore: createFakeAllmoneConfigStore(managedSoftwareConfig(9555)),
+    connectToOutputPort(input) {
+      connectionAttempts.push(input)
+      return Promise.resolve()
+    }
+  })
+
+  await service.initialize()
+  const result = await service.testOutputPortConnectivity()
+
+  assert.deepEqual(connectionAttempts, [
+    { host: '127.0.0.1', port: 9555, timeoutMs: 5000 }
+  ])
+  assert.equal(result.ok, true)
+  assert.equal(result.state, 'reachable')
+  assert.equal(result.target, 'http://127.0.0.1:9555')
+  assert.equal(typeof result.latencyMs, 'number')
+  assert.equal(typeof result.checkedAt, 'string')
+  assert(!JSON.stringify(result).includes('mgmt-secret'))
+})
+
+test('tests model output through the local OpenAI-compatible endpoint without returning the local key', async () => {
+  const store = createFakeStore(loadedSettings())
+  const requests: Array<{
+    url: string
+    method?: string
+    authorization: string | null
+    body: unknown
+  }> = []
+  const service = createRuntimeService({
+    settingsStore: store,
+    allmoneConfigStore: createFakeAllmoneConfigStore(managedSoftwareConfig(9666)),
+    outputFetch: async (input, init) => {
+      requests.push({
+        url: input instanceof Request ? input.url : input.toString(),
+        method: init?.method,
+        authorization: new Headers(init?.headers).get('authorization'),
+        body: init?.body ? JSON.parse(String(init.body)) : undefined
+      })
+      return outputJsonResponse({
+        choices: [{ message: { content: 'allmone port is working' } }]
+      })
+    }
+  })
+
+  await service.initialize()
+  const result = await service.testModelOutput({
+    model: 'test-model',
+    apiKey: 'local-secret',
+    prompt: 'say ok'
+  })
+
+  assert.deepEqual(requests, [
+    {
+      url: 'http://127.0.0.1:9666/v1/chat/completions',
+      method: 'POST',
+      authorization: 'Bearer local-secret',
+      body: {
+        model: 'test-model',
+        messages: [{ role: 'user', content: 'say ok' }],
+        stream: false
+      }
+    }
+  ])
+  assert.equal(result.ok, true)
+  assert.equal(result.state, 'reachable')
+  assert.equal(result.status, 200)
+  assert.equal(result.model, 'test-model')
+  assert.equal(result.outputText, 'allmone port is working')
+  assert.equal(result.target, 'http://127.0.0.1:9666/v1/chat/completions')
+  assert(!JSON.stringify(result).includes('local-secret'))
 })
 
 test('returns sanitized config summaries without provider secrets', async () => {

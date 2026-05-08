@@ -1,9 +1,12 @@
+import { createConnection } from 'node:net'
+
 import {
   createCliProxyApiClient,
   isCliProxyApiError,
   redactApiKey,
   redactCliProxyApiText,
   redactUrlCredentials,
+  type CliProxyApiFetch,
   type CliProxyApiClientOptions,
   type CliProxyApiConfigResult,
   type CliProxyApiManagementCheckResult,
@@ -22,7 +25,10 @@ import type {
   RuntimeConfigSummary,
   RuntimeConnectionSettingsInput,
   RuntimeLoadedSettings,
+  RuntimeModelOutputTestInput,
+  RuntimeModelOutputTestResult,
   RuntimeOpenAiProviderInput,
+  RuntimeOutputPortConnectivityResult,
   RuntimeProviderWriteResult,
   RuntimeState
 } from './types'
@@ -42,12 +48,24 @@ export type RuntimeClientFactory = (
   options: CliProxyApiClientOptions
 ) => RuntimeCliProxyApiClient
 
+export interface RuntimeOutputPortProbeInput {
+  host: string
+  port: number
+  timeoutMs: number
+}
+
+export type RuntimeOutputPortConnector = (
+  input: RuntimeOutputPortProbeInput
+) => Promise<void>
+
 export interface RuntimeServiceOptions {
   settingsStore: RuntimeSettingsStore
   allmoneConfigStore?: AllmoneConfigStore
   cliProxyApiConfigWriter?: CliProxyApiConfigWriter
   cliProxyApiProcessController?: CliProxyApiProcessController
   createClient?: RuntimeClientFactory
+  connectToOutputPort?: RuntimeOutputPortConnector
+  outputFetch?: CliProxyApiFetch
 }
 
 export interface RuntimeService {
@@ -63,6 +81,10 @@ export interface RuntimeService {
   restartManagedRuntime(): Promise<RuntimeState>
   stopManagedRuntime(): Promise<RuntimeState>
   testConnection(): Promise<CliProxyApiManagementCheckResult>
+  testOutputPortConnectivity(): Promise<RuntimeOutputPortConnectivityResult>
+  testModelOutput(
+    input: RuntimeModelOutputTestInput
+  ): Promise<RuntimeModelOutputTestResult>
   getConfigSummary(): Promise<RuntimeConfigSummary>
   upsertOpenAiCompatibilityProvider(
     input: RuntimeOpenAiProviderInput
@@ -90,6 +112,8 @@ class DefaultRuntimeService implements RuntimeService {
     | CliProxyApiProcessController
     | undefined
   private readonly createClient: RuntimeClientFactory
+  private readonly connectToOutputPort: RuntimeOutputPortConnector
+  private readonly outputFetch: CliProxyApiFetch | undefined
 
   constructor(options: RuntimeServiceOptions) {
     this.settingsStore = options.settingsStore
@@ -97,6 +121,9 @@ class DefaultRuntimeService implements RuntimeService {
     this.cliProxyApiConfigWriter = options.cliProxyApiConfigWriter
     this.cliProxyApiProcessController = options.cliProxyApiProcessController
     this.createClient = options.createClient ?? createCliProxyApiClient
+    this.connectToOutputPort =
+      options.connectToOutputPort ?? connectToTcpOutputPort
+    this.outputFetch = options.outputFetch
   }
 
   async initialize(): Promise<void> {
@@ -202,6 +229,155 @@ class DefaultRuntimeService implements RuntimeService {
     return {
       ...result,
       error: redactedError
+    }
+  }
+
+  async testOutputPortConnectivity(): Promise<RuntimeOutputPortConnectivityResult> {
+    this.ensureInitialized()
+
+    const runtime = this.getState().software?.runtime
+    const checkedAt = new Date().toISOString()
+
+    if (!runtime) {
+      return {
+        ok: false,
+        state: 'invalid_config',
+        target: 'Unavailable',
+        checkedAt,
+        error: 'Local service origin is unavailable'
+      }
+    }
+
+    const startedAt = Date.now()
+
+    try {
+      await this.connectToOutputPort({
+        host: runtime.host,
+        port: runtime.port,
+        timeoutMs: runtime.timeoutMs
+      })
+
+      return {
+        ok: true,
+        state: 'reachable',
+        target: runtime.serviceOrigin,
+        host: runtime.host,
+        port: runtime.port,
+        latencyMs: Date.now() - startedAt,
+        checkedAt
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        state: mapOutputTestError(error),
+        target: runtime.serviceOrigin,
+        host: runtime.host,
+        port: runtime.port,
+        latencyMs: Date.now() - startedAt,
+        checkedAt,
+        error: redactRuntimeOutputError(error)
+      }
+    }
+  }
+
+  async testModelOutput(
+    input: RuntimeModelOutputTestInput
+  ): Promise<RuntimeModelOutputTestResult> {
+    this.ensureInitialized()
+
+    const runtime = this.getState().software?.runtime
+    const model = input.model.trim()
+    const apiKey = input.apiKey.trim()
+    const prompt = input.prompt?.trim() || 'Reply with OK.'
+    const checkedAt = new Date().toISOString()
+
+    if (!model) {
+      throw new Error('Model is required')
+    }
+
+    if (!apiKey) {
+      throw new Error('Local API key is required')
+    }
+
+    if (!runtime) {
+      return {
+        ok: false,
+        state: 'invalid_config',
+        target: 'Unavailable',
+        model,
+        checkedAt,
+        error: 'Local API base URL is unavailable'
+      }
+    }
+
+    const target = buildChatCompletionsUrl(runtime.apiBaseUrl)
+    const startedAt = Date.now()
+
+    try {
+      const response = await fetchOutputWithTimeout({
+        fetchImpl: this.outputFetch,
+        target,
+        timeoutMs: runtime.timeoutMs,
+        apiKey,
+        body: {
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          stream: false
+        }
+      })
+      const responseBody = await response.text()
+      const latencyMs = Date.now() - startedAt
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          state: response.status === 401 || response.status === 403
+            ? 'auth_required'
+            : 'unexpected_error',
+          target,
+          model,
+          status: response.status,
+          latencyMs,
+          checkedAt,
+          error: `Model output request failed with HTTP ${response.status}`
+        }
+      }
+
+      const outputText = extractChatCompletionOutput(responseBody)
+
+      if (!outputText) {
+        return {
+          ok: false,
+          state: 'invalid_response',
+          target,
+          model,
+          status: response.status,
+          latencyMs,
+          checkedAt,
+          error: 'Model output response did not include message content'
+        }
+      }
+
+      return {
+        ok: true,
+        state: 'reachable',
+        target,
+        model,
+        status: response.status,
+        latencyMs,
+        outputText,
+        checkedAt
+      }
+    } catch (error) {
+      return {
+        ok: false,
+        state: mapOutputTestError(error),
+        target,
+        model,
+        latencyMs: Date.now() - startedAt,
+        checkedAt,
+        error: redactRuntimeOutputError(error, apiKey)
+      }
     }
   }
 
@@ -477,6 +653,197 @@ function sanitizeModelRows(
     )
 
   return rows
+}
+
+function connectToTcpOutputPort(
+  input: RuntimeOutputPortProbeInput
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const socket = createConnection({
+      host: input.host,
+      port: input.port
+    })
+    const timeout = setTimeout(() => {
+      finish(() => {
+        const error = new Error(`Timed out after ${input.timeoutMs}ms`)
+        error.name = 'TimeoutError'
+        socket.destroy()
+        reject(error)
+      })
+    }, input.timeoutMs)
+    let settled = false
+
+    function finish(callback: () => void): void {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      clearTimeout(timeout)
+      callback()
+    }
+
+    socket.once('connect', () => {
+      finish(() => {
+        socket.end()
+        resolve()
+      })
+    })
+    socket.once('error', (error) => {
+      finish(() => reject(error))
+    })
+  })
+}
+
+async function fetchOutputWithTimeout(input: {
+  fetchImpl: CliProxyApiFetch | undefined
+  target: string
+  timeoutMs: number
+  apiKey: string
+  body: unknown
+}): Promise<Response> {
+  const fetchImpl = input.fetchImpl ?? getGlobalFetch()
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), input.timeoutMs)
+
+  try {
+    return await fetchImpl(input.target, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${input.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(input.body),
+      signal: controller.signal
+    })
+  } catch (cause) {
+    if (controller.signal.aborted || isAbortError(cause)) {
+      const error = new Error(`Timed out after ${input.timeoutMs}ms`)
+      error.name = 'TimeoutError'
+      throw error
+    }
+
+    throw cause
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function getGlobalFetch(): CliProxyApiFetch {
+  if (typeof globalThis.fetch !== 'function') {
+    throw new Error('globalThis.fetch is not available')
+  }
+
+  return globalThis.fetch.bind(globalThis) as CliProxyApiFetch
+}
+
+function buildChatCompletionsUrl(apiBaseUrl: string): string {
+  const normalized = apiBaseUrl.trim().replace(/\/+$/, '')
+  return `${normalized}/chat/completions`
+}
+
+function extractChatCompletionOutput(responseBody: string): string | undefined {
+  let raw: unknown
+
+  try {
+    raw = JSON.parse(responseBody)
+  } catch {
+    return undefined
+  }
+
+  if (!isRecord(raw) || !Array.isArray(raw.choices)) {
+    return undefined
+  }
+
+  const firstChoice = raw.choices[0]
+
+  if (!isRecord(firstChoice)) {
+    return undefined
+  }
+
+  if (typeof firstChoice.text === 'string') {
+    return firstChoice.text
+  }
+
+  const message = firstChoice.message
+
+  if (!isRecord(message)) {
+    return undefined
+  }
+
+  if (typeof message.content === 'string') {
+    return message.content
+  }
+
+  if (Array.isArray(message.content)) {
+    const parts = message.content
+      .filter(isRecord)
+      .map((part) =>
+        typeof part.text === 'string'
+          ? part.text
+          : typeof part.content === 'string'
+            ? part.content
+            : ''
+      )
+      .filter(Boolean)
+
+    return parts.length > 0 ? parts.join('') : undefined
+  }
+
+  return undefined
+}
+
+function mapOutputTestError(error: unknown): RuntimeOutputPortConnectivityResult['state'] {
+  if (isAbortError(error) || getErrorName(error) === 'TimeoutError') {
+    return 'timeout'
+  }
+
+  const code = getErrorCode(error)
+
+  if (
+    code === 'ECONNREFUSED' ||
+    code === 'EHOSTUNREACH' ||
+    code === 'ENETUNREACH' ||
+    code === 'ENOTFOUND' ||
+    code === 'ECONNRESET'
+  ) {
+    return 'unreachable'
+  }
+
+  return 'unexpected_error'
+}
+
+function redactRuntimeOutputError(error: unknown, secret?: string): string {
+  const message =
+    error instanceof Error ? error.message : 'Runtime output test failed'
+  const withoutSecret = secret ? message.split(secret).join('[REDACTED]') : message
+
+  return redactCliProxyApiText(withoutSecret)
+}
+
+function isAbortError(value: unknown): boolean {
+  return (
+    value instanceof Error &&
+    (value.name === 'AbortError' || value.name === 'TimeoutError')
+  )
+}
+
+function getErrorName(error: unknown): string | undefined {
+  return error instanceof Error ? error.name : undefined
+}
+
+function getErrorCode(error: unknown): string | undefined {
+  return typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+    ? error.code
+    : undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function toRuntimeError(error: unknown): Error {

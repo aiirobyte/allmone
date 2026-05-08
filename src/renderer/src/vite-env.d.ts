@@ -5,7 +5,10 @@ import type {
 import type {
   RuntimeConfigSummary,
   RuntimeConnectionSettingsInput,
+  RuntimeModelOutputTestInput,
+  RuntimeModelOutputTestResult,
   RuntimeOpenAiProviderInput,
+  RuntimeOutputPortConnectivityResult,
   RuntimeProviderWriteResult,
   RuntimeState
 } from '../../main/runtime/types'
@@ -31,6 +34,10 @@ interface AllmoneRuntimeApi {
     input: RuntimeConnectionSettingsInput
   ) => Promise<RuntimeState>
   testConnection: () => Promise<CliProxyApiManagementCheckResult>
+  testOutputPortConnectivity: () => Promise<RuntimeOutputPortConnectivityResult>
+  testModelOutput: (
+    input: RuntimeModelOutputTestInput
+  ) => Promise<RuntimeModelOutputTestResult>
   getConfigSummary: () => Promise<RuntimeConfigSummary>
   saveOutputPort: (port: number) => Promise<RuntimeState>
   ensureInstalledThenStart: () => Promise<RuntimeState>
