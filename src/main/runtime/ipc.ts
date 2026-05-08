@@ -3,7 +3,7 @@ import type {
   RuntimeConnectionSettingsInput,
   RuntimeOpenAiProviderInput
 } from './types'
-import type { CliProxyApiOpenAiCompatibilityDeleteInput } from '../cliproxyapi'
+import type { CliProxyApiOpenAiCompatibilityDeleteInput } from '../cli-proxy-api'
 
 export const RUNTIME_IPC_CHANNELS = {
   getState: 'runtime:get-state',

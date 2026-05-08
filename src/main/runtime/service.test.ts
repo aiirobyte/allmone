@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { CliProxyApiError, type CliProxyApiConfigResult } from '../cliproxyapi'
+import { CliProxyApiError, type CliProxyApiConfigResult } from '../cli-proxy-api'
 import type {
   AllmoneConfigStore,
   AllmoneSoftwareConfig

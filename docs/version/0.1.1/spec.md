@@ -36,7 +36,7 @@ Sources:
 
 ### In Scope
 
-- Add a focused `src/main/cliproxyapi/` module.
+- Add a focused `src/main/cli-proxy-api/` module.
 - Add TypeScript types for the management API fields needed by the next versions.
 - Add a thin HTTP client for read-only calls needed by early runtime and inventory work.
 - Add error classes or discriminated error results for connection, auth, disabled-management, timeout, invalid JSON, and unexpected HTTP responses.
@@ -56,12 +56,12 @@ Sources:
 
 ## Planned File Boundaries
 
-- `src/main/cliproxyapi/types.ts`: exported request/response and normalized domain types.
-- `src/main/cliproxyapi/errors.ts`: client error types and HTTP-to-state mapping.
-- `src/main/cliproxyapi/client.ts`: fetch-based management API client.
-- `src/main/cliproxyapi/redact.ts`: shared redaction helpers for keys and URLs.
-- `src/main/cliproxyapi/index.ts`: public exports for future main-process services.
-- `src/main/cliproxyapi/*.test.ts`: Bun tests for contract behavior.
+- `src/main/cli-proxy-api/types.ts`: exported request/response and normalized domain types.
+- `src/main/cli-proxy-api/errors.ts`: client error types and HTTP-to-state mapping.
+- `src/main/cli-proxy-api/client.ts`: fetch-based management API client.
+- `src/main/cli-proxy-api/redact.ts`: shared redaction helpers for keys and URLs.
+- `src/main/cli-proxy-api/index.ts`: public exports for future main-process services.
+- `src/main/cli-proxy-api/*.test.ts`: Bun tests for contract behavior.
 - `package.json`: add `test` script only if needed.
 - `docs/version/0.1.1/todo.md`: update completion state.
 
@@ -91,7 +91,7 @@ The client should expose read-only methods first:
 
 ## Acceptance
 
-- `src/main/cliproxyapi/` exists with a clear public boundary.
+- `src/main/cli-proxy-api/` exists with a clear public boundary.
 - The client defaults to `http://localhost:8317/v0/management` but accepts an override base URL.
 - Management keys are attached only inside the client and never logged by tests or helper output.
 - Types preserve unknown CLIProxyAPI fields safely instead of throwing them away.

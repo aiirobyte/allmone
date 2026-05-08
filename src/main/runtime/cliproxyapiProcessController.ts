@@ -3,7 +3,7 @@ import { access } from 'node:fs/promises'
 import { isAbsolute, relative } from 'node:path'
 import { promisify } from 'node:util'
 
-import { redactCliProxyApiText } from '../cliproxyapi'
+import { redactCliProxyApiText } from '../cli-proxy-api'
 import type { AllmoneConfigStore } from './allmoneConfigStore'
 import type { CliProxyApiConfigWriter } from './cliproxyapiConfigWriter'
 import type {

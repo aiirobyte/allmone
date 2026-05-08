@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
-import { CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL } from '../cliproxyapi'
+import { CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL } from '../cli-proxy-api'
 import type {
   RuntimeConnectionSettings,
   RuntimeConnectionSettingsInput,

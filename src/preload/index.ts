@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 import { RUNTIME_IPC_CHANNELS } from '../main/runtime/ipc'
-import type { CliProxyApiOpenAiCompatibilityDeleteInput } from '../main/cliproxyapi'
+import type { CliProxyApiOpenAiCompatibilityDeleteInput } from '../main/cli-proxy-api'
 import type {
   RuntimeConnectionSettingsInput,
   RuntimeOpenAiProviderInput

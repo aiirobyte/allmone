@@ -42,11 +42,11 @@ Goal: define CLIProxyAPI Management API response types.
 Prompt:
 
 ```text
-Create src/main/cliproxyapi/types.ts.
+Create src/main/cli-proxy-api/types.ts.
 Add types for client options, management check state, API key list, API key usage buckets, usage queue records, auth file records, OpenAI compatibility provider entries, latest version response, config response, and generic status response.
 Represent unknown or provider-specific fields safely with Record<string, unknown>.
 Do not model provider-specific request conversion or proxy behavior.
-Add src/main/cliproxyapi/index.ts that exports the public contract types.
+Add src/main/cli-proxy-api/index.ts that exports the public contract types.
 Run bun run typecheck.
 Update docs/version/0.1.1/todo.md.
 ```
@@ -64,8 +64,8 @@ Goal: protect secrets and normalize failure states before HTTP client work.
 Prompt:
 
 ```text
-Create src/main/cliproxyapi/redact.ts with helpers to redact API keys, management keys, and credentials embedded in URLs.
-Create src/main/cliproxyapi/errors.ts with a CliProxyApiError class and a function that maps fetch/HTTP/parse failures into documented management states.
+Create src/main/cli-proxy-api/redact.ts with helpers to redact API keys, management keys, and credentials embedded in URLs.
+Create src/main/cli-proxy-api/errors.ts with a CliProxyApiError class and a function that maps fetch/HTTP/parse failures into documented management states.
 Add Bun tests covering short keys, long keys, bearer tokens, proxy URLs with userinfo, 404 management-disabled behavior, timeout, invalid JSON, and generic HTTP failures.
 Run bun run test and bun run typecheck.
 Update docs/version/0.1.1/todo.md.
@@ -84,7 +84,7 @@ Goal: add the read-only CLIProxyAPI Management API client.
 Prompt:
 
 ```text
-Create src/main/cliproxyapi/client.ts.
+Create src/main/cli-proxy-api/client.ts.
 Implement a fetch-based client that accepts baseUrl, managementKey, timeoutMs, and optional fetch implementation.
 Default baseUrl to http://localhost:8317/v0/management.
 Attach Authorization: Bearer <managementKey> when a key is present.

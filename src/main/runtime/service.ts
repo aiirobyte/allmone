@@ -10,7 +10,7 @@ import {
   type CliProxyApiOpenAiCompatibilityDeleteInput,
   type CliProxyApiOpenAiCompatibilityProviderInput,
   type CliProxyApiWriteResult
-} from '../cliproxyapi'
+} from '../cli-proxy-api'
 import type {
   AllmoneConfigStore,
   AllmoneSoftwareConfig

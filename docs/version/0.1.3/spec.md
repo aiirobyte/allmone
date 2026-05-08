@@ -17,7 +17,7 @@ v0.1.3 should not broaden the product surface. It should make the existing workf
 
 Implemented files that matter for this version:
 
-- `src/main/cliproxyapi/`: typed Management API client, status mapping, write methods, and redaction helpers.
+- `src/main/cli-proxy-api/`: typed Management API client, status mapping, write methods, and redaction helpers.
 - `src/main/runtime/settingsStore.ts`: main-process settings persistence with `safeStorage` fallback.
 - `src/main/runtime/service.ts`: runtime state, connection test, sanitized config summary, and provider writes.
 - `src/main/runtime/ipc.ts`: narrow typed IPC handlers.

@@ -10,11 +10,11 @@ Target: v0.1.1 CLIProxyAPI Runtime Contract Spike.
 Definition of done:
 
 - [x] Add or confirm `bun run test`.
-- [x] Add `src/main/cliproxyapi/types.ts`.
-- [x] Add `src/main/cliproxyapi/redact.ts`.
-- [x] Add `src/main/cliproxyapi/errors.ts`.
-- [x] Add `src/main/cliproxyapi/client.ts`.
-- [x] Add `src/main/cliproxyapi/index.ts`.
+- [x] Add `src/main/cli-proxy-api/types.ts`.
+- [x] Add `src/main/cli-proxy-api/redact.ts`.
+- [x] Add `src/main/cli-proxy-api/errors.ts`.
+- [x] Add `src/main/cli-proxy-api/client.ts`.
+- [x] Add `src/main/cli-proxy-api/index.ts`.
 - [x] Add Bun tests for redaction, error mapping, and client behavior.
 - [x] Run `bun run test`.
 - [x] Run `bun run typecheck`.
@@ -45,6 +45,6 @@ Expected next change:
 
 ## Completion Notes
 
-- Added a tested main-process `src/main/cliproxyapi/` contract module.
+- Added a tested main-process `src/main/cli-proxy-api/` contract module.
 - Tests use injected fetch implementations and do not call the real CLIProxyAPI service.
 - No renderer UI, preload bridge, Electron IPC, tray behavior, provider proxying, request routing, or response conversion was added.

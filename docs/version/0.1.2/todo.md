@@ -12,7 +12,7 @@ Definition of done:
 - [x] Create `docs/version/0.1.2/spec.md`.
 - [x] Create `docs/version/0.1.2/prompt_plan.md`.
 - [x] Create `docs/version/0.1.2/todo.md`.
-- [x] Extend `src/main/cliproxyapi/` with required write methods.
+- [x] Extend `src/main/cli-proxy-api/` with required write methods.
 - [x] Add main-process settings storage with safe management-key handling.
 - [x] Add runtime service and sanitized state/config summaries.
 - [x] Expose typed IPC for runtime status and simple configuration.

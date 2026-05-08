@@ -1,7 +1,7 @@
 import type {
   CliProxyApiManagementState,
   CliProxyApiModelAlias
-} from '../cliproxyapi'
+} from '../cli-proxy-api'
 import type { CliProxyApiProcessState } from './cliproxyapiProcessController'
 
 export interface RuntimeSoftwareConfigSummary {

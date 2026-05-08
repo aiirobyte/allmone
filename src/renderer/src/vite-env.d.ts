@@ -1,7 +1,7 @@
 import type {
   CliProxyApiManagementCheckResult,
   CliProxyApiOpenAiCompatibilityDeleteInput
-} from '../../main/cliproxyapi'
+} from '../../main/cli-proxy-api'
 import type {
   RuntimeConfigSummary,
   RuntimeConnectionSettingsInput,

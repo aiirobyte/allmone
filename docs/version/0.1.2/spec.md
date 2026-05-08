@@ -33,7 +33,7 @@ Sources:
 
 ### In Scope
 
-- Extend the `src/main/cliproxyapi/` client with the write calls needed for this version.
+- Extend the `src/main/cli-proxy-api/` client with the write calls needed for this version.
 - Add a main-process runtime service that owns the CLIProxyAPI client, current connection state, settings loading/saving, and redacted error reporting.
 - Store connection settings in main process only. The renderer may submit a management key, but it must never store one in localStorage, sessionStorage, logs, or DOM state beyond the active form field.
 - Persist non-secret settings in a file under Electron `app.getPath('userData')`.
@@ -105,9 +105,9 @@ This is intentionally narrower than payload rules. v0.1.2 does not manage reques
 
 ## Planned File Boundaries
 
-- `src/main/cliproxyapi/types.ts`: add write response types and OpenAI-compatible provider input types.
-- `src/main/cliproxyapi/client.ts`: add `upsertOpenAiCompatibilityProvider()`, `deleteOpenAiCompatibilityProvider()`, and any small helper needed for JSON write requests.
-- `src/main/cliproxyapi/*.test.ts`: cover method, URL, body, auth, status, and secret redaction behavior for write calls.
+- `src/main/cli-proxy-api/types.ts`: add write response types and OpenAI-compatible provider input types.
+- `src/main/cli-proxy-api/client.ts`: add `upsertOpenAiCompatibilityProvider()`, `deleteOpenAiCompatibilityProvider()`, and any small helper needed for JSON write requests.
+- `src/main/cli-proxy-api/*.test.ts`: cover method, URL, body, auth, status, and secret redaction behavior for write calls.
 - `src/main/runtime/types.ts`: exported runtime state, sanitized config summary, connection settings, and provider form input types.
 - `src/main/runtime/settingsStore.ts`: main-process-only settings store using `app.getPath('userData')` and `safeStorage`.
 - `src/main/runtime/service.ts`: runtime service that loads settings, creates clients, maps CLIProxyAPI failures, redacts returned data, and exposes high-level operations.

@@ -51,7 +51,7 @@ Goal: add typed CLIProxyAPI Management API reads and writes for upstream configu
 Prompt:
 
 ```text
-Read docs/version/0.1.5/spec.md, src/main/cliproxyapi/client.ts, and src/main/cliproxyapi/types.ts.
+Read docs/version/0.1.5/spec.md, src/main/cli-proxy-api/client.ts, and src/main/cli-proxy-api/types.ts.
 Extend the CLIProxyAPI client with typed methods for api-keys, gemini-api-key, codex-api-key, claude-api-key, vertex-api-key, oauth-model-alias, oauth-excluded-models, auth-files, and ampcode endpoints.
 Reuse the existing openai-compatibility client methods where possible, but align types with the broader upstream catalog.
 Support GET, PUT, PATCH, and DELETE only where CLIProxyAPI exposes them.

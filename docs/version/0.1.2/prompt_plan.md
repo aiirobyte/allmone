@@ -24,11 +24,11 @@ Goal: extend the v0.1.1 CLIProxyAPI contract from read-only status calls to the 
 Prompt:
 
 ```text
-Read docs/version/0.1.2/spec.md and src/main/cliproxyapi/.
-Extend src/main/cliproxyapi/types.ts with:
+Read docs/version/0.1.2/spec.md and src/main/cli-proxy-api/.
+Extend src/main/cli-proxy-api/types.ts with:
 - status response result types for write calls
 - OpenAI-compatible provider upsert/delete input types
-Extend src/main/cliproxyapi/client.ts with JSON request support for PUT/PATCH/DELETE.
+Extend src/main/cli-proxy-api/client.ts with JSON request support for PUT/PATCH/DELETE.
 Implement upsertOpenAiCompatibilityProvider and deleteOpenAiCompatibilityProvider.
 Keep Authorization bearer header handling inside the client.
 Add Bun tests using injected fake fetch for method, URL, body, auth header, non-2xx errors, invalid JSON errors, and redaction.
@@ -38,7 +38,7 @@ Update docs/version/0.1.2/todo.md.
 
 Acceptance:
 
-- Write calls compile and are exported from `src/main/cliproxyapi/index.ts`.
+- Write calls compile and are exported from `src/main/cli-proxy-api/index.ts`.
 - Tests do not call a real service.
 - No test output includes a whole management key or provider API key.
 

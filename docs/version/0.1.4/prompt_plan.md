@@ -77,7 +77,7 @@ Goal: let allmone own CLIProxyAPI host/port config without overwriting provider 
 Prompt:
 
 ```text
-Read docs/version/0.1.4/spec.md, src/main/runtime/service.ts, and src/main/cliproxyapi/types.ts.
+Read docs/version/0.1.4/spec.md, src/main/runtime/service.ts, and src/main/cli-proxy-api/types.ts.
 Add a config writer for ~/.allmone/runtime/cli-proxy-api/config.yaml.
 Use a structured YAML parser instead of string replacement.
 Write or patch only allmone-owned runtime fields: host, port, runtime/log directories, and local management enablement required for allmone.
