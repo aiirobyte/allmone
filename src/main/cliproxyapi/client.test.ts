@@ -256,18 +256,27 @@ test('maps successful management checks to reachable', async () => {
   assert.deepEqual(result, { ok: true, state: 'reachable', status: 200 })
 })
 
-test('patches OpenAI-compatible providers by name with JSON and auth headers', async () => {
-  let seenUrl = ''
-  let seenMethod = ''
-  let seenBody: unknown
-  let authorization: string | null = null
-  let contentType: string | null = null
+test('creates OpenAI-compatible providers by appending to the current list', async () => {
+  const seenRequests: Array<{ url: string; method: string; body?: unknown }> = []
   const fetch: CliProxyApiFetch = async (input, init) => {
-    seenUrl = inputToUrl(input)
-    seenMethod = init?.method ?? ''
-    seenBody = JSON.parse(String(init?.body))
-    authorization = headerValue(init, 'authorization')
-    contentType = headerValue(init, 'content-type')
+    const method = init?.method ?? ''
+    seenRequests.push({
+      url: inputToUrl(input),
+      method,
+      body: init?.body ? JSON.parse(String(init.body)) : undefined
+    })
+
+    if (method === 'GET') {
+      return jsonResponse({
+        'openai-compatibility': [
+          {
+            name: 'existing',
+            'base-url': 'https://example.com/v1'
+          }
+        ]
+      })
+    }
+
     return jsonResponse({ status: 'ok' })
   }
   const client = createCliProxyApiClient({
@@ -284,14 +293,82 @@ test('patches OpenAI-compatible providers by name with JSON and auth headers', a
     models: [{ name: 'moonshotai/kimi-k2:free', alias: 'kimi-k2' }]
   })
 
-  assert.equal(
-    seenUrl,
-    'http://localhost:8317/v0/management/openai-compatibility'
-  )
-  assert.equal(seenMethod, 'PATCH')
+  assert.deepEqual(seenRequests, [
+    {
+      url: 'http://localhost:8317/v0/management/openai-compatibility',
+      method: 'GET',
+      body: undefined
+    },
+    {
+      url: 'http://localhost:8317/v0/management/openai-compatibility',
+      method: 'PUT',
+      body: [
+        {
+          name: 'existing',
+          'base-url': 'https://example.com/v1'
+        },
+        {
+          name: 'openrouter',
+          disabled: false,
+          'base-url': 'https://openrouter.ai/api/v1',
+          'api-key-entries': [
+            { 'api-key': 'provider-secret', 'proxy-url': '' }
+          ],
+          models: [{ name: 'moonshotai/kimi-k2:free', alias: 'kimi-k2' }]
+        }
+      ]
+    }
+  ])
+  assert.deepEqual(result, { ok: true, status: 200, raw: { status: 'ok' } })
+})
+
+test('patches existing OpenAI-compatible providers by name with JSON and auth headers', async () => {
+  const seenRequests: Array<{ url: string; method: string; body?: unknown }> = []
+  let authorization: string | null = null
+  let contentType: string | null = null
+  const fetch: CliProxyApiFetch = async (input, init) => {
+    const method = init?.method ?? ''
+    seenRequests.push({
+      url: inputToUrl(input),
+      method,
+      body: init?.body ? JSON.parse(String(init.body)) : undefined
+    })
+    authorization = headerValue(init, 'authorization')
+    contentType = headerValue(init, 'content-type')
+
+    if (method === 'GET') {
+      return jsonResponse({
+        'openai-compatibility': [
+          {
+            name: 'openrouter',
+            'base-url': 'https://old.example.com/v1'
+          }
+        ]
+      })
+    }
+
+    return jsonResponse({ status: 'ok' })
+  }
+  const client = createCliProxyApiClient({
+    baseUrl: 'http://localhost:8317/v0/management',
+    managementKey: 'mgmt-secret',
+    fetch
+  })
+
+  const result = await client.upsertOpenAiCompatibilityProvider({
+    name: 'openrouter',
+    disabled: false,
+    'base-url': 'https://openrouter.ai/api/v1',
+    'api-key-entries': [{ 'api-key': 'provider-secret', 'proxy-url': '' }],
+    models: [{ name: 'moonshotai/kimi-k2:free', alias: 'kimi-k2' }]
+  })
+
+  assert.equal(seenRequests[0]?.method, 'GET')
+  assert.equal(seenRequests[1]?.url, 'http://localhost:8317/v0/management/openai-compatibility')
+  assert.equal(seenRequests[1]?.method, 'PATCH')
   assert.equal(authorization, 'Bearer mgmt-secret')
   assert.equal(contentType, 'application/json')
-  assert.deepEqual(seenBody, {
+  assert.deepEqual(seenRequests[1]?.body, {
     name: 'openrouter',
     value: {
       name: 'openrouter',

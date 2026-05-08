@@ -159,6 +159,24 @@ export class CliProxyApiClient {
   async upsertOpenAiCompatibilityProvider(
     provider: CliProxyApiOpenAiCompatibilityProviderInput
   ): Promise<CliProxyApiWriteResult> {
+    const current = await this.getOpenAiCompatibilityProviders()
+
+    if (
+      !current.providers.some(
+        (existing) => existing.name?.trim() === provider.name.trim()
+      )
+    ) {
+      const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+        'PUT',
+        'openai-compatibility',
+        {
+          body: [...current.providers, provider]
+        }
+      )
+
+      return toWriteResult(response)
+    }
+
     const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
       'PATCH',
       'openai-compatibility',
