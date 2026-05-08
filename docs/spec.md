@@ -4,6 +4,10 @@ Last updated: 2026-05-08
 
 This file is the current planning entry point. Specific version plans live under `docs/version/<semver>/`.
 
+Project-level planning references:
+
+- `docs/upstream_catalog.md`: canonical CLIProxyAPI upstream catalog for allmone.
+
 ## Active Version
 
 Active version: `0.1.5` planned

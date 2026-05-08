@@ -23,6 +23,8 @@ Before starting any prompt:
 
 Goal: define the complete v0.1.5 upstream catalog and shared types.
 
+Reference: `docs/upstream_catalog.md`
+
 Prompt:
 
 ```text
