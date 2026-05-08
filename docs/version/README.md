@@ -22,4 +22,4 @@ The root files in `docs/` are the current-session entry points. They point agent
 - `0.1.4`: Managed CLIProxyAPI Runtime, Software Config, And Tray MVP. Complete.
 - `0.1.5`: Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog. Complete.
 - `0.1.6`: React Renderer And Sidebar Navigation. Complete.
-- `0.2.0`: Auth Management Surface. Planned.
+- `0.2.0`: Auth Management Surface For Multiple Persisted Auth Files And Providers. In Progress.

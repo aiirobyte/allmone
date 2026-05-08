@@ -10,14 +10,14 @@ Read CLAUDE.md and docs/todo.md, then continue with the active version's next un
 
 ## Active Version
 
-Active version: `0.2.0` planned
+Active version: `0.2.0` in progress
 
 - Previous version: `docs/version/0.1.6/`
-- Active version docs: `docs/version/0.2.0/` (not created yet)
+- Active version docs: `docs/version/0.2.0/`
 
 ## Current Target
 
-Target: v0.2.0 Auth Management Surface.
+Target: v0.2.0 Auth Management Surface for multiple persisted auth files and providers.
 
 Definition of done:
 
@@ -53,17 +53,23 @@ Definition of done:
 - [x] Remove the duplicate standalone `OpenAI-Compatible Providers` module.
 - [x] Run `bun run typecheck`.
 - [x] Run `bun run build`.
-- [ ] Create `docs/version/0.2.0/spec.md`.
-- [ ] Create `docs/version/0.2.0/prompt_plan.md`.
-- [ ] Create `docs/version/0.2.0/todo.md`.
+- [x] Create `docs/version/0.2.0/spec.md`.
+- [x] Create `docs/version/0.2.0/prompt_plan.md`.
+- [x] Create `docs/version/0.2.0/todo.md`.
+- [x] Add realtime Codex device login IPC and renderer display.
+- [ ] Show multiple auth-file summaries grouped by provider.
+- [ ] Add auth files through supported CLIProxyAPI login/import/management actions.
+- [ ] Delete individual auth files through CLIProxyAPI Management API.
+- [ ] Add and delete multiple provider entries through CLIProxyAPI-backed main-process services.
+- [ ] Prove persisted auth/provider state reloads correctly after refresh/startup.
 
 ## Next Prompt
 
-Create v0.2.0 planning files.
+Continue v0.2.0 Prompt 1: Multi Auth File Management Surface.
 
 Expected next change:
 
-- Plan Auth Management Surface around CLIProxyAPI Management API without moving token contents into renderer state.
+- Show multiple auth-file summaries grouped by provider, add auth through supported handoffs, delete individual auth files, and refresh summaries without exposing token contents.
 
 ## Version Roadmap
 
@@ -74,7 +80,7 @@ Expected next change:
 - [x] v0.1.4 Managed CLIProxyAPI Runtime, Software Config, And Tray MVP: YAML config, official download/update, process control, port ownership, tray status, and quick actions.
 - [x] v0.1.5 Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog: configure local client keys and every current CLIProxyAPI upstream family.
 - [x] v0.1.6 React Renderer And Sidebar Navigation: migrate renderer to React, add Providers/Settings sidebar, and remove duplicate OpenAI-compatible provider surface.
-- [ ] v0.2.0 Auth Management Surface: API/auth resources through CLIProxyAPI.
+- [ ] v0.2.0 Auth Management Surface: multiple persisted auth files and providers through CLIProxyAPI.
 - [ ] v0.3.0 Model Resource Inventory: model-first inventory with backing provider/auth details.
 - [ ] v0.4.0 Usage And Logs: request log, usage, queue, and error visibility.
 - [ ] v0.5.0 Local Network Sharing: safe localhost/public-interface controls through CLIProxyAPI.
@@ -108,4 +114,6 @@ Expected next change:
 - 2026-05-09: User inserted v0.1.6 before v0.2.0 for React renderer migration and sidebar navigation. Created `docs/version/0.1.6/` planning files and chose the lightweight page-state React approach.
 - 2026-05-09: v0.1.6 Prompt 0 completed with React dependencies, TSX renderer entry, minimal `App` shell, a red/green renderer shell test, and `bun run typecheck`.
 - 2026-05-09: v0.1.6 completed. Migrated renderer to React, split app state/types/shared UI/Providers/Settings surfaces, added sidebar navigation, removed the duplicate standalone OpenAI-compatible provider module, preserved main-process IPC contracts, and verified with `bun run test`, `bun run typecheck`, and `bun run build`.
+- 2026-05-09: v0.2.0 Prompt 0 implemented realtime Codex device login IPC. CLIProxyAPI login stdout/stderr are piped, redacted, parsed for Codex device URL/code, forwarded to the invoking renderer, and shown in a transient Provider Login panel in Providers. Verified with `bun run test`, `bun run typecheck`, and `bun run build`.
+- 2026-05-09: v0.2.0 planning recentered on multiple persisted auth files and providers with add/delete management; broad auth metadata editing is deferred unless required for add/delete.
 - Update this file and the active version todo after every meaningful coding session.
