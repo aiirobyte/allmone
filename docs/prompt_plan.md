@@ -1,24 +1,24 @@
 # allmone Current Prompt Plan
 
-Last updated: 2026-05-08
+Last updated: 2026-05-09
 
 Specific version prompt plans live under `docs/version/<semver>/prompt_plan.md`.
 
 ## Active Version
 
-Prepare v0.2.0 planning files:
+Start v0.1.6 React renderer foundation:
 
 ```text
 Read CLAUDE.md.
 Read docs/todo.md.
-Review docs/spec.md and docs/todo.md.
-Create docs/version/0.2.0/spec.md, prompt_plan.md, and todo.md for Auth Management Surface.
+Review docs/spec.md and docs/version/0.1.6/spec.md.
+Run Prompt 0 from docs/version/0.1.6/prompt_plan.md.
 Preserve user changes and keep secrets out of renderer storage.
 ```
 
 Current next prompt:
 
-- Create v0.2.0 planning files for Auth Management Surface.
+- Add React renderer foundation without changing main-process runtime or upstream behavior.
 
 ## Operating Rule
 
