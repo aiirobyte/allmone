@@ -4,6 +4,7 @@ import type {
 } from '../../main/runtime/types'
 import type {
   LocalConnectionOutput,
+  ProviderLoginEvent,
   UpstreamAuthFileSummary,
   UpstreamProviderCatalogEntry,
   UpstreamProviderKind,
@@ -31,6 +32,11 @@ export type AmpFormInput = {
   upstreamApiKey?: string
 }
 
+export type CodexDeviceLoginState = Extract<
+  ProviderLoginEvent,
+  { type: 'codex-device-code' }
+>
+
 export type ViewState = {
   appVersion: string
   runtimeState: RuntimeState | null
@@ -41,6 +47,8 @@ export type ViewState = {
   authFiles: UpstreamAuthFileSummary[]
   localConnection: LocalConnectionOutput | null
   localKeyPlaintext: string | null
+  codexDeviceLogin: CodexDeviceLoginState | null
+  loginOutput: string[]
   busyAction: string | null
   notice: string | null
   error: string | null

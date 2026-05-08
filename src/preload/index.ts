@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-import { RUNTIME_IPC_CHANNELS } from '../main/runtime/ipc'
+import { RUNTIME_IPC_CHANNELS, RUNTIME_IPC_EVENTS } from '../main/runtime/ipc'
 import type { CliProxyApiOpenAiCompatibilityDeleteInput } from '../main/cli-proxy-api'
 import type {
   RuntimeConnectionSettingsInput,
@@ -8,6 +8,7 @@ import type {
 } from '../main/runtime/types'
 import type {
   ProviderLoginRunInput,
+  ProviderLoginEvent,
   UpstreamAmpConfig,
   UpstreamApiKeyCredentialInput,
   UpstreamProviderKind
@@ -75,6 +76,14 @@ contextBridge.exposeInMainWorld('allmone', {
     deleteAuthFile: (input: { name: string } | { all: true }) =>
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.deleteAuthFile, input),
     runLoginAction: (input: ProviderLoginRunInput) =>
-      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.runLoginAction, input)
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.runLoginAction, input),
+    onLoginEvent: (callback: (event: ProviderLoginEvent) => void) => {
+      const listener = (_event: unknown, event: ProviderLoginEvent) => callback(event)
+      ipcRenderer.on(RUNTIME_IPC_EVENTS.loginEvent, listener)
+
+      return () => {
+        ipcRenderer.removeListener(RUNTIME_IPC_EVENTS.loginEvent, listener)
+      }
+    }
   }
 })

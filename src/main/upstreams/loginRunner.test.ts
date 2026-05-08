@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { EventEmitter } from 'node:events'
 
 import {
   createProviderLoginRunner,
@@ -113,4 +114,73 @@ test('reports non-zero login exit without stopping any managed process', async (
   assert.equal(result.ok, false)
   assert.equal(result.exitCode, 2)
   assert.equal(killCalled, false)
+})
+
+test('streams redacted login output and emits Codex device login details', async () => {
+  const stdout = new EventEmitter()
+  const stderr = new EventEmitter()
+  const events: unknown[] = []
+  const runner = createProviderLoginRunner({
+    executablePath: '/tmp/allmone/cli-proxy-api',
+    configPath: '/tmp/allmone/config.yaml',
+    runtimeDir: '/tmp/allmone',
+    spawn: () =>
+      ({
+        pid: 1234,
+        stdout,
+        stderr,
+        once(
+          event: 'exit' | 'error',
+          listener:
+            | ((code: number | null, signal: NodeJS.Signals | null) => void)
+            | ((error: Error) => void)
+        ) {
+          if (event === 'exit') {
+            queueMicrotask(() => {
+              stdout.emit('data', 'Codex device URL: https://auth.openai.com/codex/device\n')
+              stdout.emit('data', 'Codex device code: ABCD-1234\n')
+              stderr.emit('data', 'Authorization: Bearer mgmt-secret\n')
+              ;(listener as (
+                code: number | null,
+                signal: NodeJS.Signals | null
+              ) => void)(0, null)
+            })
+          }
+          return this
+        }
+      }) as ProviderLoginChildProcess
+  })
+
+  const result = await runner.run(
+    { kind: 'codex-device-login' },
+    { onEvent: (event) => events.push(event) }
+  )
+
+  assert.equal(result.ok, true)
+  assert.deepEqual(events, [
+    {
+      type: 'output',
+      kind: 'codex-device-login',
+      stream: 'stdout',
+      text: 'Codex device URL: https://auth.openai.com/codex/device\n'
+    },
+    {
+      type: 'output',
+      kind: 'codex-device-login',
+      stream: 'stdout',
+      text: 'Codex device code: ABCD-1234\n'
+    },
+    {
+      type: 'codex-device-code',
+      kind: 'codex-device-login',
+      url: 'https://auth.openai.com/codex/device',
+      code: 'ABCD-1234'
+    },
+    {
+      type: 'output',
+      kind: 'codex-device-login',
+      stream: 'stderr',
+      text: 'Authorization: Bearer [REDACTED]\n'
+    }
+  ])
 })

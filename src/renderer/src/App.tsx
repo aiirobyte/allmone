@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import { useEffect, useState } from 'react'
 
 import type { RuntimeState } from '../../main/runtime/types'
-import type { ProviderLoginRunInput } from '../../main/upstreams'
+import type { ProviderLoginEvent, ProviderLoginRunInput } from '../../main/upstreams'
 import { createInitialViewState } from './appState'
 import { Feedback } from './components/Feedback'
 import { Sidebar } from './components/Sidebar'
@@ -97,6 +97,12 @@ export function App({
   }, [])
 
   useEffect(() => {
+    return window.allmone.runtime.onLoginEvent((event) => {
+      setState((current) => applyLoginEvent(current, event))
+    })
+  }, [])
+
+  useEffect(() => {
     if (!isManagedBusy(state.runtimeState)) {
       return
     }
@@ -175,8 +181,12 @@ export function App({
     action: string,
     callback: () => Promise<Partial<ViewState>>
   ): Promise<void> {
+    const resetLoginState = action.startsWith('login:')
+
     setState((current) => ({
       ...current,
+      codexDeviceLogin: resetLoginState ? null : current.codexDeviceLogin,
+      loginOutput: resetLoginState ? [] : current.loginOutput,
       busyAction: action,
       error: null,
       notice: null
@@ -367,6 +377,8 @@ export function App({
 
       return {
         ...(await loadUpstreams()),
+        codexDeviceLogin: null,
+        loginOutput: [],
         notice: 'Login handoff finished'
       }
     })
@@ -452,4 +464,18 @@ export function App({
       </main>
     </div>
   )
+}
+
+function applyLoginEvent(state: ViewState, event: ProviderLoginEvent): ViewState {
+  if (event.type === 'codex-device-code') {
+    return {
+      ...state,
+      codexDeviceLogin: event
+    }
+  }
+
+  return {
+    ...state,
+    loginOutput: [...state.loginOutput, event.text].slice(-20)
+  }
 }

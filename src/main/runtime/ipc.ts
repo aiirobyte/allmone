@@ -5,6 +5,7 @@ import type {
 } from './types'
 import type { CliProxyApiOpenAiCompatibilityDeleteInput } from '../cli-proxy-api'
 import type {
+  ProviderLoginEvent,
   ProviderLoginRunner,
   ProviderLoginRunInput,
   UpstreamService
@@ -42,6 +43,10 @@ export const RUNTIME_IPC_CHANNELS = {
   getAuthFiles: 'runtime:upstream-get-auth-files',
   deleteAuthFile: 'runtime:upstream-delete-auth-file',
   runLoginAction: 'runtime:upstream-run-login-action'
+} as const
+
+export const RUNTIME_IPC_EVENTS = {
+  loginEvent: 'runtime:upstream-login-event'
 } as const
 
 export const REGISTERED_RUNTIME_CHANNELS = Object.values(RUNTIME_IPC_CHANNELS)
@@ -170,9 +175,27 @@ export function registerRuntimeIpcHandlers(options: RuntimeIpcOptions): void {
   ipcMain.handle(RUNTIME_IPC_CHANNELS.deleteAuthFile, (_event, payload) =>
     getUpstreamService(options).deleteAuthFile(validateAuthFileDeletePayload(payload))
   )
-  ipcMain.handle(RUNTIME_IPC_CHANNELS.runLoginAction, (_event, payload) =>
-    getProviderLoginRunner(options).run(validateLoginActionPayload(payload))
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.runLoginAction, (event, payload) =>
+    getProviderLoginRunner(options).run(validateLoginActionPayload(payload), {
+      onEvent: (loginEvent) => sendProviderLoginEvent(event, loginEvent)
+    })
   )
+}
+
+function sendProviderLoginEvent(event: unknown, loginEvent: ProviderLoginEvent): void {
+  if (
+    typeof event !== 'object' ||
+    event === null ||
+    !('sender' in event) ||
+    typeof event.sender !== 'object' ||
+    event.sender === null ||
+    !('send' in event.sender) ||
+    typeof event.sender.send !== 'function'
+  ) {
+    return
+  }
+
+  event.sender.send(RUNTIME_IPC_EVENTS.loginEvent, loginEvent)
 }
 
 function getUpstreamService(options: RuntimeIpcOptions): UpstreamService {

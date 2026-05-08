@@ -258,6 +258,18 @@ h3 {
   padding: 12px;
 }
 
+.login-event-panel {
+  border-color: #b8c7cb;
+  background: #fbfdfd;
+}
+
+.login-event-panel a {
+  overflow-wrap: anywhere;
+  color: #19545a;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .summary-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

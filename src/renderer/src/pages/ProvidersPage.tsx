@@ -60,6 +60,10 @@ export function ProvidersPage({
         </div>
       ) : null}
 
+      {state.codexDeviceLogin || state.loginOutput.length > 0 ? (
+        <ProviderLoginPanel state={state} />
+      ) : null}
+
       <div className="upstream-grid">
         <LocalConnectionCard
           state={state}
@@ -97,6 +101,30 @@ export function ProvidersPage({
         ))}
       </div>
     </section>
+  )
+}
+
+function ProviderLoginPanel({ state }: { state: ViewState }): ReactElement {
+  const deviceLogin = state.codexDeviceLogin
+
+  return (
+    <div className="upstream-block login-event-panel" aria-live="polite">
+      <h3>Provider Login</h3>
+      {deviceLogin ? (
+        <>
+          <a href={deviceLogin.url} target="_blank" rel="noreferrer">
+            {deviceLogin.url}
+          </a>
+          <label>
+            <span>Device Code</span>
+            <input readOnly value={deviceLogin.code} />
+          </label>
+        </>
+      ) : null}
+      {state.loginOutput.length > 0 ? (
+        <pre>{state.loginOutput.join('')}</pre>
+      ) : null}
+    </div>
   )
 }
 

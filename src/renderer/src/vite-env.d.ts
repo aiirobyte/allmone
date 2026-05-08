@@ -12,6 +12,7 @@ import type {
 import type {
   LocalApiKeyState,
   LocalConnectionOutput,
+  ProviderLoginEvent,
   ProviderLoginRunInput,
   ProviderLoginRunResult,
   UpstreamAmpConfig,
@@ -64,6 +65,7 @@ interface AllmoneRuntimeApi {
   getAuthFiles: () => Promise<UpstreamAuthFileSummary[]>
   deleteAuthFile: (input: { name: string } | { all: true }) => Promise<unknown>
   runLoginAction: (input: ProviderLoginRunInput) => Promise<ProviderLoginRunResult>
+  onLoginEvent: (callback: (event: ProviderLoginEvent) => void) => () => void
 }
 
 declare global {

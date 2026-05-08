@@ -19,14 +19,14 @@ function createFakeIpcMain() {
         handlers.set(channel, handler)
       }
     },
-    invoke(channel: string, payload?: unknown) {
+    invoke(channel: string, payload?: unknown, event: unknown = {}) {
       const handler = handlers.get(channel)
 
       if (!handler) {
         throw new Error(`Missing handler: ${channel}`)
       }
 
-      return handler({}, payload)
+      return handler(event, payload)
     },
     handlers
   }
@@ -242,8 +242,14 @@ function createFakeUpstreamService(): UpstreamService & { calls: string[] } {
 function createFakeLoginRunner(): ProviderLoginRunner & { calls: unknown[] } {
   return {
     calls: [],
-    async run(input) {
+    async run(input, options) {
       this.calls.push(input)
+      options?.onEvent?.({
+        type: 'codex-device-code',
+        kind: 'codex-device-login',
+        url: 'https://auth.openai.com/codex/device',
+        code: 'ABCD-1234'
+      })
       return { ok: true, exitCode: 0, signal: null }
     }
   }
@@ -431,4 +437,38 @@ test('validates upstream IPC payloads before calling upstream services', async (
     'delete-auth-file'
   ])
   assert.deepEqual(providerLoginRunner.calls, [{ kind: 'claude-login', importPath: undefined }])
+})
+
+test('forwards provider login events to the invoking renderer', async () => {
+  const ipc = createFakeIpcMain()
+  const sent: Array<{ channel: string; payload: unknown }> = []
+  registerRuntimeIpcHandlers({
+    ipcMain: ipc.ipcMain,
+    runtimeService: createFakeService(),
+    providerLoginRunner: createFakeLoginRunner()
+  })
+
+  await ipc.invoke(
+    RUNTIME_IPC_CHANNELS.runLoginAction,
+    { kind: 'codex-device-login' },
+    {
+      sender: {
+        send(channel: string, payload: unknown) {
+          sent.push({ channel, payload })
+        }
+      }
+    }
+  )
+
+  assert.deepEqual(sent, [
+    {
+      channel: 'runtime:upstream-login-event',
+      payload: {
+        type: 'codex-device-code',
+        kind: 'codex-device-login',
+        url: 'https://auth.openai.com/codex/device',
+        code: 'ABCD-1234'
+      }
+    }
+  ])
 })

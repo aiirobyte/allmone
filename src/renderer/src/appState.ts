@@ -11,6 +11,8 @@ export function createInitialViewState(appVersion = ''): ViewState {
     authFiles: [],
     localConnection: null,
     localKeyPlaintext: null,
+    codexDeviceLogin: null,
+    loginOutput: [],
     busyAction: 'Loading',
     notice: null,
     error: null
