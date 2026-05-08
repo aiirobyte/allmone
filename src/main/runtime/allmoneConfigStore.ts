@@ -12,6 +12,7 @@ export const CLI_PROXY_API_DEFAULT_RELEASE_PAGE_URL =
 const CONFIG_VERSION = 1
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 8317
+const DEFAULT_TIMEOUT_MS = 5_000
 
 export interface AllmoneSoftwareConfig {
   version: 1
@@ -23,6 +24,7 @@ export interface AllmoneSoftwareConfig {
   runtime: {
     host: string
     port: number
+    timeoutMs: number
     configPath: string
     apiBaseUrl: string
     managementBaseUrl: string
@@ -31,14 +33,14 @@ export interface AllmoneSoftwareConfig {
 
 export interface AllmoneSoftwareConfigInput {
   version?: number
-  cliproxyapi?: Partial<AllmoneSoftwareConfig['cliproxyapi']>
+  cliproxyapi?: Partial<AllmoneSoftwareConfig['cliproxyapi']> & {
+    runtime?: Partial<AllmoneSoftwareConfig['runtime']>
+  }
   runtime?: Partial<AllmoneSoftwareConfig['runtime']>
 }
 
 export interface AllmoneConfigStoreOptions {
   runtimeHome: RuntimeHomePaths
-  // Deprecated no-op: runtime-settings.json still owns management key storage.
-  oldSettingsFilePath?: string
 }
 
 export interface AllmoneConfigStore {
@@ -78,11 +80,12 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
       version: input.version ?? current.version,
       cliproxyapi: {
         ...current.cliproxyapi,
-        ...input.cliproxyapi
-      },
-      runtime: {
-        ...current.runtime,
-        ...input.runtime
+        ...input.cliproxyapi,
+        runtime: {
+          ...current.runtime,
+          ...input.cliproxyapi?.runtime,
+          ...input.runtime
+        }
       }
     })
 
@@ -108,12 +111,13 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
       cliproxyapi: {
         releaseMetadataUrl: CLI_PROXY_API_DEFAULT_RELEASE_METADATA_URL,
         releasePageUrl: CLI_PROXY_API_DEFAULT_RELEASE_PAGE_URL,
-        localExecutablePath: this.runtimeHome.cliProxyApiExecutablePath
-      },
-      runtime: {
-        host: DEFAULT_HOST,
-        port: DEFAULT_PORT,
-        configPath: this.runtimeHome.runtimeConfigPath
+        localExecutablePath: this.runtimeHome.cliProxyApiExecutablePath,
+        runtime: {
+          host: DEFAULT_HOST,
+          port: DEFAULT_PORT,
+          timeoutMs: DEFAULT_TIMEOUT_MS,
+          configPath: this.runtimeHome.runtimeConfigPath
+        }
       }
     })
   }
@@ -121,9 +125,10 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
   private normalizeConfig(value: unknown): AllmoneSoftwareConfig {
     const record = asRecord(value, 'config')
     const cliproxyapi = asRecord(record.cliproxyapi, 'cliproxyapi')
-    const runtime = asRecord(record.runtime, 'runtime')
+    const runtime = asRecord(cliproxyapi.runtime, 'cliproxyapi.runtime')
     const host = normalizeHost(runtime.host)
     const port = normalizePort(runtime.port)
+    const timeoutMs = normalizeTimeoutMs(runtime.timeoutMs)
 
     return {
       version: CONFIG_VERSION,
@@ -146,6 +151,7 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
       runtime: {
         host,
         port,
+        timeoutMs,
         configPath: validateRuntimeConfigPath(
           runtime.configPath,
           this.runtimeHome
@@ -210,6 +216,14 @@ function normalizePort(value: unknown): number {
   }
 
   return value
+}
+
+function normalizeTimeoutMs(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return DEFAULT_TIMEOUT_MS
+  }
+
+  return Math.round(value)
 }
 
 function validateHttpUrl(value: unknown, field: string): string {
@@ -290,14 +304,13 @@ function toConfigFile(
       localExecutablePath: toHomePath(
         config.cliproxyapi.localExecutablePath,
         runtimeHome
-      )
-    },
-    runtime: {
-      host: config.runtime.host,
-      port: config.runtime.port,
-      configPath: toHomePath(config.runtime.configPath, runtimeHome),
-      apiBaseUrl: config.runtime.apiBaseUrl,
-      managementBaseUrl: config.runtime.managementBaseUrl
+      ),
+      runtime: {
+        host: config.runtime.host,
+        port: config.runtime.port,
+        timeoutMs: config.runtime.timeoutMs,
+        configPath: toHomePath(config.runtime.configPath, runtimeHome)
+      }
     }
   }
 }

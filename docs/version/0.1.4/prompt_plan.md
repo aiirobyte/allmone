@@ -1,7 +1,7 @@
 # allmone v0.1.4 Prompt Plan
 
-Last updated: 2026-05-07
-Status: Planned
+Last updated: 2026-05-08
+Status: Complete
 
 This plan implements `docs/version/0.1.4/spec.md`.
 
@@ -27,11 +27,11 @@ Prompt:
 
 ```text
 Read docs/version/0.1.4/spec.md and src/main/runtime/.
-Add a main-process runtime home module that resolves ~/.allmone from the user home directory and exposes paths for config.yaml, runtime/bin, runtime/downloads, runtime/logs, runtime/tmp, runtime/config.yaml, and runtime/install.json.
+Add a main-process runtime home module that resolves ~/.allmone from the user home directory and exposes paths for config.yaml, runtime/cli-proxy-api/bin, runtime/cli-proxy-api/downloads, runtime/cli-proxy-api/logs, runtime/cli-proxy-api/tmp, runtime/cli-proxy-api/config.yaml, runtime/cli-proxy-api/management-key.json, and runtime/cli-proxy-api/install.json.
 Add an AllmoneConfigStore that creates, reads, validates, and writes ~/.allmone/config.yaml with a structured YAML parser.
-Store non-secret settings in config.yaml: CLIProxyAPI release metadata URL, release page URL, local executable path, runtime host, runtime output port, runtime config path, and derived safe API URLs.
+Store non-secret source settings in config.yaml: CLIProxyAPI release metadata URL, release page URL, local executable path, and CLIProxyAPI runtime settings under cliproxyapi.runtime: host, output port, Management API timeout, and config path. Derive safe API URLs in memory.
 Keep Management API credentials and other secrets out of config.yaml and continue using Electron safeStorage or main-process memory for secrets.
-Delete the old Electron userData runtime settings file during startup without migrating old values.
+Delete old runtime-settings.json files during startup without migrating old values.
 Add tests for path resolution, directory creation, default YAML creation, default port, invalid stored port normalization, invalid localExecutablePath rejection, invalid releaseMetadataUrl rejection, and old-settings deletion.
 Run bun run test and bun run typecheck.
 Update docs/version/0.1.4/todo.md.
@@ -53,8 +53,8 @@ Prompt:
 ```text
 Read docs/version/0.1.4/spec.md and the official CLIProxyAPI release sources listed there.
 Create a main-process installer module for CLIProxyAPI release metadata, platform asset matching, checksum verification, download, extraction, executable permissions, and install metadata.
-Read the release metadata URL and local executable path from AllmoneConfigStore, defaulting to official CLIProxyAPI release metadata and ~/.allmone/runtime/bin.
-Reject local executable paths outside ~/.allmone/runtime/bin for v0.1.4.
+Read the release metadata URL and local executable path from AllmoneConfigStore, defaulting to official CLIProxyAPI release metadata and ~/.allmone/runtime/cli-proxy-api/bin.
+Reject local executable paths outside ~/.allmone/runtime/cli-proxy-api/bin for v0.1.4.
 Use injected fetch/filesystem/archive adapters in tests; tests must not perform network downloads.
 Prefer launching an existing installed binary when release metadata cannot be fetched.
 Keep failed downloads and failed checksum verification from replacing the current executable.
@@ -78,11 +78,11 @@ Prompt:
 
 ```text
 Read docs/version/0.1.4/spec.md, src/main/runtime/service.ts, and src/main/cliproxyapi/types.ts.
-Add a config writer for ~/.allmone/runtime/config.yaml.
+Add a config writer for ~/.allmone/runtime/cli-proxy-api/config.yaml.
 Use a structured YAML parser instead of string replacement.
 Write or patch only allmone-owned runtime fields: host, port, runtime/log directories, and local management enablement required for allmone.
 Preserve existing openai-compatibility, api-keys, auth, payload, and unknown fields.
-Load managed host/port/config path from AllmoneConfigStore and update runtime service initialization so the Management API base URL is derived from the managed host/port.
+Load managed host/port/config path from AllmoneConfigStore's cliproxyapi.runtime settings and update runtime service initialization so the Management API base URL is derived from the managed host/port.
 Validate port input before writing: integer, 1..65535.
 When the user saves a new port, update config.yaml, recompute safe derived URLs, patch CLIProxyAPI config, and restart the managed process in the later process-control prompt.
 Add tests proving port changes update config.yaml, preserve provider config, and invalid ports do not write files.
@@ -104,7 +104,7 @@ Prompt:
 
 ```text
 Read docs/version/0.1.4/spec.md and src/main/index.ts.
-Create a process controller that launches only the managed binary under ~/.allmone/runtime/bin with the allmone-owned config path.
+Create a process controller that launches only the managed binary under ~/.allmone/runtime/cli-proxy-api/bin with the allmone-owned config path.
 Pass the generated Management API credential from main process to the child process without exposing it over IPC.
 Track process states for missing, installing, ready, starting, running, stopping, stopped, crashed, update_failed, and launch_failed where useful.
 Implement idempotent start, stop, restart, and ensureInstalledThenStart methods.
@@ -131,7 +131,7 @@ Prompt:
 Read docs/version/0.1.4/spec.md, src/main/runtime/ipc.ts, and src/preload/index.ts.
 Add IPC handlers for reading managed runtime state, saving output port, ensuring install/update, start, restart, stop, and copying safe API base values where main-process clipboard access is needed.
 Validate every payload before calling the service.
-Expose sanitized software config fields needed by the renderer: release metadata URL, local executable path, runtime host, runtime port, API base URL, and Management API base URL without credentials.
+Expose sanitized software config fields needed by the renderer: release metadata URL, local executable path, `cliproxyapi.runtime.host`, `cliproxyapi.runtime.port`, API base URL, and Management API base URL without credentials.
 Do not expose generated Management API credentials, provider API keys, proxy credentials, or sensitive headers.
 Update preload and renderer global types.
 Add IPC tests for valid commands, invalid port payloads, invalid command payloads, and state redaction.

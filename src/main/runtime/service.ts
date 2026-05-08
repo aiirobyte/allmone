@@ -180,7 +180,7 @@ class DefaultRuntimeService implements RuntimeService {
   }
 
   async stopManagedRuntime(): Promise<RuntimeState> {
-    await this.getManagedProcessController().stop()
+    await this.getManagedProcessController().shutdownAll()
     return this.getState()
   }
 
@@ -363,7 +363,8 @@ function withManagedBaseUrl(
     ...loaded,
     connection: {
       ...loaded.connection,
-      baseUrl: config.runtime.managementBaseUrl
+      baseUrl: config.runtime.managementBaseUrl,
+      timeoutMs: config.runtime.timeoutMs
     }
   }
 }

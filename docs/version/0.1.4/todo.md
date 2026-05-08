@@ -15,12 +15,12 @@ Definition of done:
 - [x] Create and use `~/.allmone` for managed runtime files.
 - [x] Store non-secret software configuration in `~/.allmone/config.yaml`.
 - [x] Store CLIProxyAPI download address and local executable path in software configuration.
-- [x] Store install metadata at `~/.allmone/runtime/install.json`.
+- [x] Store install metadata at `~/.allmone/runtime/cli-proxy-api/install.json`.
 - [x] Download missing CLIProxyAPI executable from official releases.
 - [x] Check official release metadata and safely update stale managed executables.
-- [x] Launch the managed executable from `~/.allmone/runtime/bin/`.
+- [x] Launch the managed executable from `~/.allmone/runtime/cli-proxy-api/bin/`.
 - [x] Restart and shutdown the allmone-managed CLIProxyAPI process.
-- [x] Generate and patch `~/.allmone/runtime/config.yaml` without erasing provider config.
+- [x] Generate and patch `~/.allmone/runtime/cli-proxy-api/config.yaml` without erasing provider config.
 - [x] Let allmone own and save the API output port.
 - [x] Derive and expose the safe OpenAI-compatible API base URL.
 - [x] Add tray status and quick actions.
@@ -44,7 +44,7 @@ Expected next change:
 - Use `~/.allmone` as the allmone-owned runtime home.
 - Use `~/.allmone/config.yaml` for non-secret software configuration.
 - Do not store secrets in `~/.allmone/config.yaml`.
-- Do not launch a configured CLIProxyAPI executable path outside `~/.allmone/runtime/bin/` in v0.1.4.
+- Do not launch a configured CLIProxyAPI executable path outside `~/.allmone/runtime/cli-proxy-api/bin/` in v0.1.4.
 - Do not take over PATH, Homebrew, systemd, launchd, Windows services, or external CLIProxyAPI processes.
 - Do not perform privileged installation.
 - Do not call a real CLIProxyAPI service from tests.
@@ -60,7 +60,8 @@ Expected next change:
 - Planning created on 2026-05-07.
 - User-selected install strategy: allmone downloads and updates official CLIProxyAPI releases into `~/.allmone`, then manages that executable.
 - Software config format: YAML at `~/.allmone/config.yaml`.
-- The YAML config includes CLIProxyAPI release metadata URL, release page URL, managed local executable path, runtime host, runtime port, CLIProxyAPI config path, and derived safe API URLs.
+- Management key file: JSON at `~/.allmone/runtime/cli-proxy-api/management-key.json`; old `runtime-settings.json` files are deleted without migration.
+- The YAML config includes CLIProxyAPI release metadata URL, release page URL, managed local executable path, and CLIProxyAPI runtime settings under `cliproxyapi.runtime`: host, port, Management API timeout, and config path. Safe API URLs are derived in memory.
 - Discovery in v0.1.4 means discovering the managed executable and install metadata under `~/.allmone`, not scanning system installations.
 - API output port is allmone-owned and should update CLIProxyAPI config plus derived safe URLs.
 - Existing managed executable should launch even when update checks fail.

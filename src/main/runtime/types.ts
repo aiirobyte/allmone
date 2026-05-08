@@ -13,6 +13,7 @@ export interface RuntimeSoftwareConfigSummary {
   runtime: {
     host: string
     port: number
+    timeoutMs: number
     configPath: string
     apiBaseUrl: string
     managementBaseUrl: string
@@ -27,8 +28,6 @@ export interface RuntimeConnectionSettings {
 }
 
 export interface RuntimeConnectionSettingsInput {
-  baseUrl?: string
-  timeoutMs?: number
   managementKey?: string
   clearManagementKey?: boolean
 }

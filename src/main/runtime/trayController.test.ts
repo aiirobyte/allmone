@@ -19,12 +19,13 @@ function runtimeState(
         releaseMetadataUrl:
           'https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest',
         releasePageUrl: 'https://github.com/router-for-me/CLIProxyAPI/releases/latest',
-        localExecutablePath: '/tmp/allmone/runtime/bin/cli-proxy-api'
+        localExecutablePath: '/tmp/allmone/runtime/cli-proxy-api/bin/cli-proxy-api'
       },
       runtime: {
         host: '127.0.0.1',
         port: 8317,
-        configPath: '/tmp/allmone/runtime/config.yaml',
+        timeoutMs: 5000,
+        configPath: '/tmp/allmone/runtime/cli-proxy-api/config.yaml',
         apiBaseUrl: 'http://127.0.0.1:8317/v1',
         managementBaseUrl: 'http://127.0.0.1:8317/v0/management'
       }

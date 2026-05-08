@@ -29,7 +29,7 @@ Definition of done:
 - [ ] Add copyable local API base output.
 - [ ] Add Amp integration UI and service flow.
 - [ ] Add account/OAuth/imported upstream visibility.
-- [ ] Add and use `~/.allmone/runtime/auth` as the managed CLIProxyAPI auth directory.
+- [ ] Add and use `~/.allmone/runtime/cli-proxy-api/auth` as the managed CLIProxyAPI auth directory.
 - [ ] Add CLIProxyAPI login/import handoffs for supported account-backed upstreams.
 - [ ] Keep secrets out of renderer localStorage/sessionStorage/IndexedDB/logs/DOM data attributes.
 - [ ] Keep allmone free of API proxying, provider adapters, routing, payload rules, and request/response transformation.
@@ -59,12 +59,18 @@ Expected first change:
 - Do not raw-edit YAML with string replacement for provider configuration.
 - Prefer CLIProxyAPI Management API writes. If an endpoint is missing, mark the operation unsupported rather than inventing allmone behavior.
 - Preserve unknown CLIProxyAPI config fields.
-- For the allmone-managed runtime, keep OAuth token files under `~/.allmone/runtime/auth`.
+- For the allmone-managed runtime, keep OAuth token files under `~/.allmone/runtime/cli-proxy-api/auth`.
 - Login/import handoffs must be explicit user actions.
 - One-shot login/import child processes must not replace the managed runtime child process.
 
 ## Planning Notes
 
+- 2026-05-08: Renderer Connection module was removed; Management API Test now lives inside Managed CLIProxyAPI. Management URL and timeout come from `~/.allmone/config.yaml`; the management key stays main-process-only.
+- 2026-05-08: Encrypted Management API credential storage is `~/.allmone/runtime/cli-proxy-api/management-key.json`; old `runtime-settings.json` files are deleted without migration.
+- 2026-05-08: CLIProxyAPI-managed runtime files now live under `~/.allmone/runtime/cli-proxy-api/`, leaving `~/.allmone/runtime/` as the parent for future third-party runtimes.
+- 2026-05-08: `~/.allmone/config.yaml` stores CLIProxyAPI runtime settings under `cliproxyapi.runtime`; the old top-level `runtime` block is not supported.
+- 2026-05-08: Startup install check now adopts an existing managed CLIProxyAPI executable without fetching release metadata; manual Check Update remains the network update path.
+- 2026-05-08: Auto-start now enters `starting` immediately during install validation and only shows `installing` when the managed executable is missing.
 - Planning created on 2026-05-08.
 - User requested all current CLIProxyAPI upstreams, not only OpenAI-compatible and Anthropic.
 - Current official CLIProxyAPI sources checked during planning:

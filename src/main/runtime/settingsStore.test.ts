@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -60,17 +60,21 @@ test('loads default connection settings on first launch', async () => {
 
     const loaded = await store.load()
 
-    assert.equal(loaded.connection.baseUrl, 'http://localhost:8317/v0/management')
-    assert.equal(loaded.connection.timeoutMs, 5000)
     assert.equal(loaded.connection.managementKeyConfigured, false)
     assert.equal(loaded.connection.managementKeyPersisted, false)
     assert.equal(loaded.managementKey, undefined)
   })
 })
 
-test('saves non-secret settings without writing a plaintext management key', async () => {
+test('saves only the encrypted management key without software settings', async () => {
   await withTempStore(async (userDataPath) => {
-    const filePath = join(userDataPath, '.allmone', 'runtime', 'runtime-settings.json')
+    const filePath = join(
+      userDataPath,
+      '.allmone',
+      'runtime',
+      'cli-proxy-api',
+      'management-key.json'
+    )
     const store = createRuntimeSettingsStore({
       app: createFakeApp(userDataPath),
       safeStorage: createSafeStorage(),
@@ -78,29 +82,49 @@ test('saves non-secret settings without writing a plaintext management key', asy
     })
 
     const saved = await store.saveConnectionSettings({
-      baseUrl: ' http://localhost:9000/v0/management ',
-      timeoutMs: 3000,
       managementKey: 'mgmt-super-secret'
     })
 
     const raw = await readFile(filePath, 'utf8')
-    assert.equal(saved.connection.baseUrl, 'http://localhost:9000/v0/management')
-    assert.equal(saved.connection.timeoutMs, 3000)
+    const parsed = JSON.parse(raw)
+
     assert.equal(saved.connection.managementKeyConfigured, true)
     assert.equal(saved.connection.managementKeyPersisted, true)
     assert.equal(saved.managementKey, 'mgmt-super-secret')
+    assert.deepEqual(Object.keys(parsed), ['managementKeyEncrypted'])
     assert(!raw.includes('mgmt-super-secret'))
     assert(raw.includes('managementKeyEncrypted'))
+    assert(!raw.includes('baseUrl'))
+    assert(!raw.includes('timeoutMs'))
   })
 })
 
-test('migrates old userData runtime settings into managed runtime home and deletes the old file', async () => {
+test('deletes old runtime settings files without migration', async () => {
   await withTempStore(async (userDataPath) => {
-    const oldFilePath = join(userDataPath, 'runtime-settings.json')
-    const filePath = join(userDataPath, '.allmone', 'runtime', 'runtime-settings.json')
+    const oldUserDataFilePath = join(userDataPath, 'runtime-settings.json')
+    const oldManagedFilePath = join(
+      userDataPath,
+      '.allmone',
+      'runtime',
+      'runtime-settings.json'
+    )
+    const oldCliProxyApiManagedFilePath = join(
+      userDataPath,
+      '.allmone',
+      'runtime',
+      'cli-proxy-api',
+      'runtime-settings.json'
+    )
+    const filePath = join(
+      userDataPath,
+      '.allmone',
+      'runtime',
+      'cli-proxy-api',
+      'management-key.json'
+    )
 
     await writeFile(
-      oldFilePath,
+      oldUserDataFilePath,
       JSON.stringify({
         connection: {
           baseUrl: 'http://localhost:9000/v0/management',
@@ -110,24 +134,50 @@ test('migrates old userData runtime settings into managed runtime home and delet
           .toString('base64')
       })
     )
+    await mkdir(join(userDataPath, '.allmone', 'runtime'), { recursive: true })
+    await writeFile(
+      oldManagedFilePath,
+      JSON.stringify({
+        managementKeyEncrypted: Buffer.from('enc:old-managed-key').toString(
+          'base64'
+        )
+      })
+    )
+    await mkdir(join(userDataPath, '.allmone', 'runtime', 'cli-proxy-api'), {
+      recursive: true
+    })
+    await writeFile(
+      oldCliProxyApiManagedFilePath,
+      JSON.stringify({
+        managementKeyEncrypted: Buffer.from('enc:old-cliproxyapi-key').toString(
+          'base64'
+        )
+      })
+    )
 
     const store = createRuntimeSettingsStore({
       app: createFakeApp(userDataPath),
       safeStorage: createSafeStorage(),
       filePath,
-      oldSettingsFilePath: oldFilePath
+      oldSettingsFilePaths: [
+        oldUserDataFilePath,
+        oldManagedFilePath,
+        oldCliProxyApiManagedFilePath
+      ]
     })
 
     const loaded = await store.load()
-    const raw = await readFile(filePath, 'utf8')
 
-    assert.equal(loaded.connection.baseUrl, 'http://localhost:9000/v0/management')
-    assert.equal(loaded.connection.managementKeyConfigured, true)
-    assert.equal(loaded.connection.managementKeyPersisted, true)
-    assert.equal(loaded.managementKey, 'migrated-management-key')
-    assert(raw.includes('managementKeyEncrypted'))
-    assert(!raw.includes('migrated-management-key'))
-    await assert.rejects(() => readFile(oldFilePath, 'utf8'), /ENOENT/)
+    assert.equal(loaded.connection.managementKeyConfigured, false)
+    assert.equal(loaded.connection.managementKeyPersisted, false)
+    assert.equal(loaded.managementKey, undefined)
+    await assert.rejects(() => readFile(filePath, 'utf8'), /ENOENT/)
+    await assert.rejects(() => readFile(oldUserDataFilePath, 'utf8'), /ENOENT/)
+    await assert.rejects(() => readFile(oldManagedFilePath, 'utf8'), /ENOENT/)
+    await assert.rejects(
+      () => readFile(oldCliProxyApiManagedFilePath, 'utf8'),
+      /ENOENT/
+    )
   })
 })
 
@@ -142,7 +192,7 @@ test('keeps management keys in memory when safe storage is unavailable', async (
       managementKey: 'session-only-key'
     })
     const loadedAgain = await store.load()
-    const raw = await readFile(join(userDataPath, 'runtime-settings.json'), 'utf8')
+    const raw = await readFile(join(userDataPath, 'management-key.json'), 'utf8')
 
     assert.equal(saved.connection.managementKeyConfigured, true)
     assert.equal(saved.connection.managementKeyPersisted, false)
@@ -162,7 +212,7 @@ test('generates a management key without writing it in plaintext', async () => {
 
     const generated = await store.ensureManagementKey()
     const loadedAgain = await store.ensureManagementKey()
-    const raw = await readFile(join(userDataPath, 'runtime-settings.json'), 'utf8')
+    const raw = await readFile(join(userDataPath, 'management-key.json'), 'utf8')
 
     assert.equal(generated.managementKey, 'generated-management-key')
     assert.equal(generated.connection.managementKeyConfigured, true)
@@ -176,12 +226,8 @@ test('generates a management key without writing it in plaintext', async () => {
 test('reports no available key when decrypting persisted key fails', async () => {
   await withTempStore(async (userDataPath) => {
     await writeFile(
-      join(userDataPath, 'runtime-settings.json'),
+      join(userDataPath, 'management-key.json'),
       JSON.stringify({
-        connection: {
-          baseUrl: 'http://localhost:8317/v0/management',
-          timeoutMs: 5000
-        },
         managementKeyEncrypted: Buffer.from('bad').toString('base64')
       })
     )
@@ -198,7 +244,7 @@ test('reports no available key when decrypting persisted key fails', async () =>
   })
 })
 
-test('clears a saved management key without losing base settings', async () => {
+test('clears a saved management key without writing software settings', async () => {
   await withTempStore(async (userDataPath) => {
     const store = createRuntimeSettingsStore({
       app: createFakeApp(userDataPath),
@@ -206,19 +252,20 @@ test('clears a saved management key without losing base settings', async () => {
     })
 
     await store.saveConnectionSettings({
-      baseUrl: 'http://localhost:9000/v0/management',
       managementKey: 'mgmt-super-secret'
     })
     const cleared = await store.saveConnectionSettings({
       clearManagementKey: true
     })
-    const raw = await readFile(join(userDataPath, 'runtime-settings.json'), 'utf8')
+    const raw = await readFile(join(userDataPath, 'management-key.json'), 'utf8')
 
-    assert.equal(cleared.connection.baseUrl, 'http://localhost:9000/v0/management')
     assert.equal(cleared.connection.managementKeyConfigured, false)
     assert.equal(cleared.connection.managementKeyPersisted, false)
     assert.equal(cleared.managementKey, undefined)
+    assert.deepEqual(JSON.parse(raw), {})
     assert(!raw.includes('managementKeyEncrypted'))
     assert(!raw.includes('mgmt-super-secret'))
+    assert(!raw.includes('baseUrl'))
+    assert(!raw.includes('timeoutMs'))
   })
 })

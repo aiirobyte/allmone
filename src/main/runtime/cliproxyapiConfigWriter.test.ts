@@ -60,7 +60,7 @@ test('patches only allmone-owned CLIProxyAPI runtime fields', async () => {
 
     assert.equal(parsed.host, '127.0.0.1')
     assert.equal(parsed.port, 8317)
-    assert.equal(parsed['auth-dir'], '~/.allmone/runtime/auth')
+    assert.equal(parsed['auth-dir'], '~/.allmone/runtime/cli-proxy-api/auth')
     assert.equal(parsed['logging-to-file'], true)
     assert.equal(parsed['remote-management']['allow-remote'], false)
     assert.equal(parsed['remote-management']['secret-key'], 'existing-secret')
@@ -90,12 +90,9 @@ test('saving the output port updates software config and CLIProxyAPI config', as
       await readFile(runtimeHome.runtimeConfigPath, 'utf8')
     )
 
-    assert.equal(allmoneConfig.runtime.port, 9444)
-    assert.equal(allmoneConfig.runtime.apiBaseUrl, 'http://127.0.0.1:9444/v1')
-    assert.equal(
-      allmoneConfig.runtime.managementBaseUrl,
-      'http://127.0.0.1:9444/v0/management'
-    )
+    assert.equal(allmoneConfig.cliproxyapi.runtime.port, 9444)
+    assert(!('apiBaseUrl' in allmoneConfig.cliproxyapi.runtime))
+    assert(!('managementBaseUrl' in allmoneConfig.cliproxyapi.runtime))
     assert.equal(cliProxyApiConfig.port, 9444)
     assert.equal(cliProxyApiConfig.host, '127.0.0.1')
   })

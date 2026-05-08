@@ -164,7 +164,7 @@ Prompt:
 
 ```text
 Read docs/version/0.1.5/spec.md, v0.1.4 process controller, and CLIProxyAPI command flags.
-Patch the allmone-managed CLIProxyAPI config so auth-dir points to ~/.allmone/runtime/auth, and create that directory through the runtime-home layer.
+Patch the allmone-managed CLIProxyAPI config so auth-dir points to ~/.allmone/runtime/cli-proxy-api/auth, and create that directory through the runtime-home layer.
 Add auth-file summary reads plus disable/delete operations through CLIProxyAPI Management API.
 Add a ProviderLoginRunner that starts one-shot CLIProxyAPI commands with the allmone-managed binary and config path for --login, --antigravity-login, --claude-login, --codex-login, --codex-device-login, --kimi-login, and --vertex-import.
 Use injected process, file-dialog, and shell/open adapters for tests.
@@ -178,7 +178,7 @@ Update docs/version/0.1.5/todo.md.
 Acceptance:
 
 - OAuth/account upstreams are visible in allmone.
-- The allmone-managed runtime uses ~/.allmone/runtime/auth for token files.
+- The allmone-managed runtime uses ~/.allmone/runtime/cli-proxy-api/auth for token files.
 - User-triggered login/import handoffs use CLIProxyAPI commands.
 - Token file contents never cross IPC.
 

@@ -136,7 +136,7 @@ test('rejects unsupported CLIProxyAPI installer platforms', () => {
   )
 })
 
-test('keeps the current executable when checksum verification fails', async () => {
+test('keeps the current executable when manual update checksum verification fails', async () => {
   await withTempRuntimeHome(async (homeDir) => {
     const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
     const configStore = createAllmoneConfigStore({ runtimeHome })
@@ -165,7 +165,7 @@ test('keeps the current executable when checksum verification fails', async () =
     })
 
     await assert.rejects(
-      () => installer.ensureInstalled(),
+      () => installer.checkForUpdate(),
       /Checksum mismatch/
     )
 
@@ -176,7 +176,7 @@ test('keeps the current executable when checksum verification fails', async () =
   })
 })
 
-test('uses an existing executable when release metadata cannot be fetched', async () => {
+test('uses an existing executable when manual update release metadata cannot be fetched', async () => {
   await withTempRuntimeHome(async (homeDir) => {
     const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'linux' })
     const configStore = createAllmoneConfigStore({ runtimeHome })
@@ -191,16 +191,269 @@ test('uses an existing executable when release metadata cannot be fetched', asyn
       arch: 'x64',
       fileSystem: createNodeFileSystemAdapter(),
       archiveAdapter: successfulArchiveAdapter('updated binary'),
+      readExecutableVersion: async () => '6.9.47',
       fetchAdapter: fetchAdapter({
         [CLI_PROXY_API_DEFAULT_RELEASE_METADATA_URL]: new Error('rate limited')
       })
+    })
+
+    const result = await installer.checkForUpdate()
+
+    assert.equal(result.status, 'existing')
+    assert.equal(result.executablePath, runtimeHome.cliProxyApiExecutablePath)
+    assert.match(result.metadataFetchError ?? '', /rate limited/)
+    const installMetadata = JSON.parse(
+      await readFile(runtimeHome.installMetadataPath, 'utf8')
+    )
+    assert.equal(installMetadata.version, 'v6.9.47')
+    assert.equal(installMetadata.executablePath, runtimeHome.cliProxyApiExecutablePath)
+    assert.equal(typeof installMetadata.check_at, 'number')
+    assertNoUnneededInstallMetadataFields(installMetadata)
+    assert.equal(
+      await readFile(runtimeHome.cliProxyApiExecutablePath, 'utf8'),
+      'existing binary'
+    )
+  })
+})
+
+test('uses an existing executable when release metadata fetch times out', async () => {
+  await withTempRuntimeHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'linux' })
+    const configStore = createAllmoneConfigStore({ runtimeHome })
+
+    await ensureRuntimeHome(runtimeHome)
+    await writeFile(runtimeHome.cliProxyApiExecutablePath, 'existing binary')
+
+    const installer = createCliProxyApiInstaller({
+      runtimeHome,
+      configStore,
+      platform: 'linux',
+      arch: 'x64',
+      fileSystem: createNodeFileSystemAdapter(),
+      archiveAdapter: successfulArchiveAdapter('updated binary'),
+      readExecutableVersion: async () => '6.9.47',
+      metadataFetchTimeoutMs: 1,
+      fetchAdapter: async () => await new Promise(() => {})
+    })
+
+    const result = await installer.checkForUpdate()
+
+    assert.equal(result.status, 'existing')
+    assert.equal(result.executablePath, runtimeHome.cliProxyApiExecutablePath)
+    assert.match(result.metadataFetchError ?? '', /timed out/i)
+    assert.equal(
+      await readFile(runtimeHome.cliProxyApiExecutablePath, 'utf8'),
+      'existing binary'
+    )
+  })
+})
+
+test('does not fetch release metadata on startup when install metadata has an executable path', async () => {
+  await withTempRuntimeHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
+    const configStore = createAllmoneConfigStore({ runtimeHome })
+    let metadataFetchCount = 0
+
+    await ensureRuntimeHome(runtimeHome)
+    await writeFile(runtimeHome.cliProxyApiExecutablePath, 'existing binary')
+    await writeFile(
+      runtimeHome.installMetadataPath,
+      `${JSON.stringify({
+        version: 'v6.10.9',
+        executablePath: runtimeHome.cliProxyApiExecutablePath,
+        check_at: 1767225600000
+      })}\n`
+    )
+
+    const installer = createCliProxyApiInstaller({
+      runtimeHome,
+      configStore,
+      platform: 'darwin',
+      arch: 'arm64',
+      fileSystem: createNodeFileSystemAdapter(),
+      archiveAdapter: successfulArchiveAdapter('updated binary'),
+      fetchAdapter: async () => {
+        metadataFetchCount += 1
+        throw new Error('startup should not fetch release metadata')
+      }
     })
 
     const result = await installer.ensureInstalled()
 
     assert.equal(result.status, 'existing')
     assert.equal(result.executablePath, runtimeHome.cliProxyApiExecutablePath)
-    assert.match(result.metadataFetchError ?? '', /rate limited/)
+    assert.equal(result.version, 'v6.10.9')
+    assert.equal(metadataFetchCount, 0)
+  })
+})
+
+test('does not fetch release metadata on startup when a local executable already exists', async () => {
+  await withTempRuntimeHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
+    const configStore = createAllmoneConfigStore({ runtimeHome })
+    let metadataFetchCount = 0
+
+    await ensureRuntimeHome(runtimeHome)
+    await writeFile(runtimeHome.cliProxyApiExecutablePath, 'existing binary')
+
+    const installer = createCliProxyApiInstaller({
+      runtimeHome,
+      configStore,
+      platform: 'darwin',
+      arch: 'arm64',
+      fileSystem: createNodeFileSystemAdapter(),
+      archiveAdapter: successfulArchiveAdapter('updated binary'),
+      readExecutableVersion: async () => '6.9.47',
+      fetchAdapter: async () => {
+        metadataFetchCount += 1
+        throw new Error('startup should not fetch release metadata')
+      }
+    })
+
+    const result = await installer.ensureInstalled()
+    const installMetadata = JSON.parse(
+      await readFile(runtimeHome.installMetadataPath, 'utf8')
+    )
+
+    assert.equal(result.status, 'existing')
+    assert.equal(result.executablePath, runtimeHome.cliProxyApiExecutablePath)
+    assert.equal(result.version, 'v6.9.47')
+    assert.equal(metadataFetchCount, 0)
+    assert.equal(installMetadata.version, 'v6.9.47')
+    assert.equal(installMetadata.executablePath, runtimeHome.cliProxyApiExecutablePath)
+    assert.equal(
+      await readFile(runtimeHome.cliProxyApiExecutablePath, 'utf8'),
+      'existing binary'
+    )
+  })
+})
+
+test('fetches release metadata on manual update even when install metadata exists', async () => {
+  await withTempRuntimeHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
+    const configStore = createAllmoneConfigStore({ runtimeHome })
+    const metadata = releaseMetadata([DARWIN_ASSET])
+    let metadataFetchCount = 0
+
+    await ensureRuntimeHome(runtimeHome)
+    await writeFile(runtimeHome.cliProxyApiExecutablePath, 'existing binary')
+    await writeFile(
+      runtimeHome.installMetadataPath,
+      `${JSON.stringify({
+        version: 'v6.10.9',
+        executablePath: runtimeHome.cliProxyApiExecutablePath,
+        check_at: 1767225600000
+      })}\n`
+    )
+
+    const installer = createCliProxyApiInstaller({
+      runtimeHome,
+      configStore,
+      platform: 'darwin',
+      arch: 'arm64',
+      fileSystem: createNodeFileSystemAdapter(),
+      archiveAdapter: {
+        async extractExecutable() {
+          throw new Error('archive extraction should not run')
+        }
+      },
+      fetchAdapter: async (url) => {
+        metadataFetchCount += 1
+        return fetchAdapter({
+          [CLI_PROXY_API_DEFAULT_RELEASE_METADATA_URL]: JSON.stringify(metadata)
+        })(url)
+      }
+    })
+
+    const result = await installer.checkForUpdate()
+
+    assert.equal(result.status, 'up_to_date')
+    assert.equal(metadataFetchCount, 1)
+  })
+})
+
+test('refreshes install metadata for an existing up-to-date executable during manual update', async () => {
+  await withTempRuntimeHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
+    const configStore = createAllmoneConfigStore({ runtimeHome })
+    const metadata = releaseMetadata([DARWIN_ASSET])
+
+    await ensureRuntimeHome(runtimeHome)
+    await writeFile(runtimeHome.cliProxyApiExecutablePath, 'existing binary')
+    await writeFile(
+      runtimeHome.installMetadataPath,
+      `${JSON.stringify({
+        version: 'v6.10.9',
+        executablePath: runtimeHome.cliProxyApiExecutablePath,
+        check_at: 1767225600000
+      })}\n`
+    )
+
+    const installer = createCliProxyApiInstaller({
+      runtimeHome,
+      configStore,
+      platform: 'darwin',
+      arch: 'arm64',
+      fileSystem: createNodeFileSystemAdapter(),
+      archiveAdapter: {
+        async extractExecutable() {
+          throw new Error('archive extraction should not run')
+        }
+      },
+      now: () => new Date('2026-05-08T00:00:00.000Z'),
+      fetchAdapter: fetchAdapter({
+        [CLI_PROXY_API_DEFAULT_RELEASE_METADATA_URL]: JSON.stringify(metadata)
+      })
+    })
+
+    const result = await installer.checkForUpdate()
+    const installMetadata = JSON.parse(
+      await readFile(runtimeHome.installMetadataPath, 'utf8')
+    )
+
+    assert.equal(result.status, 'up_to_date')
+    assert.equal(installMetadata.version, 'v6.10.9')
+    assert.equal(installMetadata.executablePath, runtimeHome.cliProxyApiExecutablePath)
+    assert.equal(installMetadata.check_at, 1778198400000)
+    assertNoUnneededInstallMetadataFields(installMetadata)
+  })
+})
+
+test('records local executable metadata on startup when install metadata is missing', async () => {
+  await withTempRuntimeHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
+    const configStore = createAllmoneConfigStore({ runtimeHome })
+    let metadataFetchCount = 0
+
+    await ensureRuntimeHome(runtimeHome)
+    await writeFile(runtimeHome.cliProxyApiExecutablePath, 'existing binary')
+
+    const installer = createCliProxyApiInstaller({
+      runtimeHome,
+      configStore,
+      platform: 'darwin',
+      arch: 'arm64',
+      fileSystem: createNodeFileSystemAdapter(),
+      archiveAdapter: successfulArchiveAdapter('updated binary'),
+      readExecutableVersion: async () => '6.10.9',
+      fetchAdapter: async () => {
+        metadataFetchCount += 1
+        throw new Error('startup should not fetch release metadata')
+      }
+    })
+
+    const result = await installer.ensureInstalled()
+    const installMetadata = JSON.parse(
+      await readFile(runtimeHome.installMetadataPath, 'utf8')
+    )
+
+    assert.equal(result.status, 'existing')
+    assert.equal(result.version, 'v6.10.9')
+    assert.equal(metadataFetchCount, 0)
+    assert.equal(installMetadata.version, 'v6.10.9')
+    assert.equal(installMetadata.executablePath, runtimeHome.cliProxyApiExecutablePath)
+    assert.equal(typeof installMetadata.check_at, 'number')
+    assertNoUnneededInstallMetadataFields(installMetadata)
     assert.equal(
       await readFile(runtimeHome.cliProxyApiExecutablePath, 'utf8'),
       'existing binary'
@@ -242,15 +495,32 @@ test('writes non-secret install metadata after a successful install', async () =
       'installed executable'
     )
     assert.equal(installMetadata.version, 'v6.10.9')
-    assert.equal(installMetadata.assetName, WINDOWS_ASSET)
-    assert.equal(
-      installMetadata.releasePageUrl,
-      CLI_PROXY_API_DEFAULT_RELEASE_PAGE_URL
-    )
     assert.equal(installMetadata.checksumSha256, checksum)
     assert.equal(installMetadata.executablePath, runtimeHome.cliProxyApiExecutablePath)
+    assert.equal(typeof installMetadata.check_at, 'number')
+    assertNoUnneededInstallMetadataFields(installMetadata)
     assert(!JSON.stringify(installMetadata).includes('managementKey'))
     assert(!JSON.stringify(installMetadata).includes('api-key'))
     assert(!JSON.stringify(installMetadata).includes('password'))
   })
 })
+
+function assertNoUnneededInstallMetadataFields(
+  metadata: Record<string, unknown>
+): void {
+  for (const field of [
+    'platform',
+    'arch',
+    'assetName',
+    'sourceType',
+    'sourceUrl',
+    'releasePageUrl',
+    'releaseMetadataUrl',
+    'installedAt',
+    'installedAtTimestamp',
+    'updatedAt',
+    'updatedAtTimestamp'
+  ]) {
+    assert(!(field in metadata), `${field} should not be written`)
+  }
+}

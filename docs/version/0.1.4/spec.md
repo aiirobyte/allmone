@@ -1,6 +1,6 @@
 # allmone v0.1.4 Spec
 
-Last updated: 2026-05-07
+Last updated: 2026-05-08
 Status: Complete
 
 ## Version Goal
@@ -53,14 +53,16 @@ allmone owns a single local runtime home:
 ~/.allmone/
   config.yaml
   runtime/
-    bin/
-      cli-proxy-api
-      cli-proxy-api.exe
-    config.yaml
-    downloads/
-    install.json
-    logs/
-    tmp/
+    cliproxyapi/
+      bin/
+        cli-proxy-api
+        cli-proxy-api.exe
+      config.yaml
+      management-key.json
+      downloads/
+      install.json
+      logs/
+      tmp/
 ```
 
 Rules:
@@ -71,8 +73,9 @@ Rules:
 - Keep allmone-managed CLIProxyAPI files under this directory.
 - Keep downloads temporary until checksum verification and extraction succeed.
 - Store install metadata separately from secrets.
+- Store the generated Management API credential ciphertext in `~/.allmone/runtime/cli-proxy-api/management-key.json`.
 - Continue using Electron `safeStorage` for generated management credentials where encryption is available.
-- If old v0.1.2/v0.1.3 settings exist under Electron `userData`, delete the old runtime settings file without migrating values.
+- If old v0.1.2/v0.1.3 `runtime-settings.json` files exist under Electron `userData`, `~/.allmone/runtime/`, or `~/.allmone/runtime/cli-proxy-api/`, delete them without migrating values.
 
 ## Software Config
 
@@ -85,23 +88,22 @@ version: 1
 cliproxyapi:
   releaseMetadataUrl: https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest
   releasePageUrl: https://github.com/router-for-me/CLIProxyAPI/releases/latest
-  localExecutablePath: ~/.allmone/runtime/bin/cli-proxy-api
-runtime:
-  host: 127.0.0.1
-  port: 8317
-  configPath: ~/.allmone/runtime/config.yaml
-  apiBaseUrl: http://127.0.0.1:8317/v1
-  managementBaseUrl: http://127.0.0.1:8317/v0/management
+  localExecutablePath: ~/.allmone/runtime/cli-proxy-api/bin/cli-proxy-api
+  runtime:
+    host: 127.0.0.1
+    port: 8317
+    timeoutMs: 5000
+    configPath: ~/.allmone/runtime/cli-proxy-api/config.yaml
 ```
 
 Rules:
 
 - Do not store Management API credentials, provider API keys, proxy credentials, sensitive headers, or generated runtime passwords in `config.yaml`.
 - Use a structured YAML parser for reads and writes.
-- Validate `version`, `cliproxyapi.releaseMetadataUrl`, `cliproxyapi.releasePageUrl`, `cliproxyapi.localExecutablePath`, `runtime.host`, `runtime.port`, and `runtime.configPath` before use.
+- Validate `version`, `cliproxyapi.releaseMetadataUrl`, `cliproxyapi.releasePageUrl`, `cliproxyapi.localExecutablePath`, `cliproxyapi.runtime.host`, `cliproxyapi.runtime.port`, `cliproxyapi.runtime.timeoutMs`, and `cliproxyapi.runtime.configPath` before use.
 - Default `releaseMetadataUrl` and `releasePageUrl` to the official CLIProxyAPI locations.
-- For v0.1.4, `localExecutablePath` must resolve under `~/.allmone/runtime/bin/`; do not use it to take over external system installs.
-- Store configured values in YAML; derived URLs may be cached but must be recomputed when `host` or `port` changes.
+- For v0.1.4, `localExecutablePath` must resolve under `~/.allmone/runtime/cli-proxy-api/bin/`; do not use it to take over external system installs.
+- Store only configured source values in YAML; derive API and Management URLs in memory from `host` and `port`.
 
 ## Scope
 
@@ -109,20 +111,20 @@ Rules:
 
 - Add a main-process runtime-home resolver for `~/.allmone`.
 - Add an allmone software config store for `~/.allmone/config.yaml`.
-- Store CLIProxyAPI release metadata URL, release page URL, local executable path, runtime host, runtime port, runtime config path, and safe derived API URLs in the software config.
-- Store install metadata at `~/.allmone/runtime/install.json`.
-- Discover the managed CLIProxyAPI executable by checking the configured local executable path under `~/.allmone/runtime/bin/` and install metadata.
+- Store CLIProxyAPI release metadata URL, release page URL, local executable path, and CLIProxyAPI runtime settings under `cliproxyapi.runtime` in the software config.
+- Store install metadata at `~/.allmone/runtime/cli-proxy-api/install.json`.
+- Discover the managed CLIProxyAPI executable by checking the configured local executable path under `~/.allmone/runtime/cli-proxy-api/bin/` and install metadata.
 - Download from the configured official CLIProxyAPI release metadata URL when no managed executable exists.
 - Check official latest release metadata on startup and download an update when a newer release is available.
 - Select the release asset for the current platform and CPU architecture.
 - Verify release downloads using the official checksum asset when available.
-- Extract the executable into `~/.allmone/runtime/bin/` and make it executable on Unix-like platforms.
-- Generate an allmone-owned CLIProxyAPI config at `~/.allmone/runtime/config.yaml`.
+- Extract the executable into `~/.allmone/runtime/cli-proxy-api/bin/` and make it executable on Unix-like platforms.
+- Generate an allmone-owned CLIProxyAPI config at `~/.allmone/runtime/cli-proxy-api/config.yaml`.
 - Preserve CLIProxyAPI-managed config sections when allmone updates only its owned fields.
 - Manage these allmone-owned config fields:
   - service host, default `127.0.0.1`
   - service output port, default `8317`
-  - log/output directories under `~/.allmone/runtime/`
+  - log/output directories under `~/.allmone/runtime/cli-proxy-api/`
   - local management enablement needed for allmone to call Management API
 - Generate and store the Management API credential in main process only.
 - Pass the generated credential to the managed CLIProxyAPI process without exposing it to renderer state.
@@ -182,7 +184,7 @@ No secrets should be shown.
 
 ### Launch Existing Managed Runtime
 
-If a managed executable already exists under `~/.allmone/runtime/bin/`, allmone starts that executable immediately. Release checks may happen in parallel, but an unreachable GitHub API must not block local launch.
+If a managed executable already exists under `~/.allmone/runtime/cli-proxy-api/bin/`, allmone starts that executable immediately. Release checks may happen in parallel, but an unreachable GitHub API must not block local launch.
 
 If an update is available, allmone downloads it, replaces the managed executable only after verification, and restarts the process if needed.
 
@@ -192,10 +194,11 @@ The user or app can update non-secret allmone settings through `~/.allmone/confi
 
 - CLIProxyAPI release metadata URL
 - CLIProxyAPI release page URL
-- allmone-managed local executable path under `~/.allmone/runtime/bin/`
-- runtime host
-- runtime output port
-- CLIProxyAPI config path
+- allmone-managed local executable path under `~/.allmone/runtime/cli-proxy-api/bin/`
+- CLIProxyAPI runtime host under `cliproxyapi.runtime.host`
+- CLIProxyAPI runtime output port under `cliproxyapi.runtime.port`
+- Management API timeout
+- CLIProxyAPI config path under `cliproxyapi.runtime.configPath`
 
 Invalid YAML or invalid values should leave the last valid in-memory config active and show a redacted config error.
 
@@ -231,9 +234,9 @@ Tray actions must call the same main-process runtime manager used by the rendere
 Add a small managed-runtime layer beside the existing Management API service:
 
 - `RuntimeHome`: resolves and creates `~/.allmone` paths.
-- `AllmoneConfigStore`: reads/writes `~/.allmone/config.yaml`, validates non-secret software settings, and computes derived URLs.
+- `AllmoneConfigStore`: reads/writes `~/.allmone/config.yaml`, validates non-secret software settings including `cliproxyapi.runtime`, and computes derived URLs.
 - `CliProxyApiInstaller`: fetches release metadata, matches assets, downloads, verifies, extracts, and records install metadata.
-- `CliProxyApiConfigWriter`: reads/writes `~/.allmone/runtime/config.yaml`, updates only allmone-owned fields, and preserves provider/auth sections managed by CLIProxyAPI.
+- `CliProxyApiConfigWriter`: reads/writes `~/.allmone/runtime/cli-proxy-api/config.yaml`, updates only allmone-owned fields, and preserves provider/auth sections managed by CLIProxyAPI.
 - `CliProxyApiProcessController`: owns the child process, starts/stops/restarts it, captures redacted lifecycle errors, and reports state.
 - `RuntimeService`: continues to own Management API calls and config summaries, but receives the managed runtime's generated Management API URL and credential.
 - `TrayController`: renders native tray menu state and dispatches commands into the managed runtime service.
@@ -244,10 +247,10 @@ The main process is the only process that may hold the generated Management API 
 
 1. App startup resolves `~/.allmone` and initializes the YAML software config plus runtime install metadata.
 2. Main process loads or generates the Management API credential.
-3. Main process loads `~/.allmone/config.yaml`, validates host/port/download URL/local executable path, and derives Management/API base URLs.
+3. Main process loads `~/.allmone/config.yaml`, validates `cliproxyapi.runtime` host/port/timeout/config path plus download URL/local executable path, and derives Management/API base URLs.
 4. Installer discovers the managed binary at the configured local executable path.
 5. If missing or stale, installer downloads and verifies the official release.
-6. Config writer writes or patches `~/.allmone/runtime/config.yaml`.
+6. Config writer writes or patches `~/.allmone/runtime/cli-proxy-api/config.yaml`.
 7. Process controller spawns CLIProxyAPI with the allmone config and generated credential.
 8. Runtime service rebuilds its CLIProxyAPI Management API client from the managed URL and credential.
 9. Renderer and tray request sanitized state through IPC/main-process callbacks.

@@ -91,8 +91,12 @@ app.whenReady().then(async () => {
   const settingsStore = createRuntimeSettingsStore({
     app,
     safeStorage,
-    filePath: runtimeHome.runtimeSettingsPath,
-    oldSettingsFilePath: join(app.getPath('userData'), 'runtime-settings.json')
+    filePath: runtimeHome.managementKeyPath,
+    oldSettingsFilePaths: [
+      join(app.getPath('userData'), 'runtime-settings.json'),
+      join(runtimeHome.rootDir, 'runtime', 'runtime-settings.json'),
+      join(runtimeHome.runtimeDir, 'runtime-settings.json')
+    ]
   })
   await settingsStore.ensureManagementKey()
 
@@ -118,7 +122,7 @@ app.whenReady().then(async () => {
     cliProxyApiConfigWriter,
     cliProxyApiProcessController: processController
   })
-  stopManagedRuntime = () => processController.stop()
+  stopManagedRuntime = () => processController.shutdownAll()
 
   await allmoneConfigStore.load()
   await runtimeService.initialize()
@@ -179,9 +183,36 @@ app.on('window-all-closed', () => {
 })
 
 function createTrayImage(): Electron.NativeImage {
+  for (const path of [
+    join(app.getAppPath(), 'assets', 'meow-cat-icon.svg'),
+    join(__dirname, '../../assets/meow-cat-icon.svg')
+  ]) {
+    const image = nativeImage.createFromPath(path)
+
+    if (!image.isEmpty()) {
+      const trayImage = image.resize({ width: 18, height: 18 })
+
+      trayImage.setTemplateImage(true)
+      return trayImage
+    }
+  }
+
   const svg = encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><rect width="18" height="18" rx="4" fill="#12343b"/><path d="M5 11.5 8 4l5 10-3-2.5-2 2-3-2z" fill="#d7f4ec"/></svg>'
+    [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">',
+      '<path fill="#000" d="M4.2 7.8 5.1 3.3l3 2.6h1.8l3-2.6.9 4.5v2.8c0 3.1-2.1 5.2-4.8 5.2s-4.8-2.1-4.8-5.2V7.8Z"/>',
+      '<path fill="#fff" d="M6.7 9.1a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Zm4.6 0a.9.9 0 1 0 0-1.8.9.9 0 0 0 0 1.8Z"/>',
+      '<path fill="#fff" d="M9 10.2c.5 0 .9.3.9.7s-.4.7-.9.7-.9-.3-.9-.7.4-.7.9-.7Z"/>',
+      '</svg>'
+    ].join('')
   )
 
-  return nativeImage.createFromDataURL(`data:image/svg+xml;charset=utf-8,${svg}`)
+  const image = nativeImage.createFromDataURL(
+    `data:image/svg+xml;charset=utf-8,${svg}`
+  )
+
+  const trayImage = image.resize({ width: 18, height: 18 })
+
+  trayImage.setTemplateImage(true)
+  return trayImage
 }

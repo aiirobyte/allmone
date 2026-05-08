@@ -76,12 +76,13 @@ function managedSoftwareConfig(port = 9444): AllmoneSoftwareConfig {
     cliproxyapi: {
       releaseMetadataUrl: 'https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest',
       releasePageUrl: 'https://github.com/router-for-me/CLIProxyAPI/releases/latest',
-      localExecutablePath: '/tmp/allmone/runtime/bin/cli-proxy-api'
+      localExecutablePath: '/tmp/allmone/runtime/cli-proxy-api/bin/cli-proxy-api'
     },
     runtime: {
       host: '127.0.0.1',
       port,
-      configPath: '/tmp/allmone/runtime/config.yaml',
+      timeoutMs: 5000,
+      configPath: '/tmp/allmone/runtime/cli-proxy-api/config.yaml',
       apiBaseUrl: `http://127.0.0.1:${port}/v1`,
       managementBaseUrl: `http://127.0.0.1:${port}/v0/management`
     }
@@ -118,6 +119,11 @@ function createFakeProcessController(
     },
     async stop() {
       this.calls.push('stop')
+      state = { status: 'stopped' }
+      return state
+    },
+    async shutdownAll() {
+      this.calls.push('shutdownAll')
       state = { status: 'stopped' }
       return state
     },
@@ -249,9 +255,7 @@ test('rebuilds the CLIProxyAPI client after saving connection settings', async (
 
   await service.initialize()
   await service.saveConnectionSettings({
-    baseUrl: 'http://localhost:9000/v0/management',
-    managementKey: 'new-management-key',
-    timeoutMs: 2500
+    managementKey: 'new-management-key'
   })
 
   assert.deepEqual(seenOptions.at(-1), {
@@ -314,8 +318,59 @@ test('derives the management base URL from managed software config', async () =>
   )
   assert.equal(
     service.getState().software?.cliproxyapi.localExecutablePath,
-    '/tmp/allmone/runtime/bin/cli-proxy-api'
+    '/tmp/allmone/runtime/cli-proxy-api/bin/cli-proxy-api'
   )
+})
+
+test('derives the management timeout from managed software config', async () => {
+  const store = createFakeStore(
+    loadedSettings({
+      connection: {
+        baseUrl: 'http://localhost:8317/v0/management',
+        timeoutMs: 1000,
+        managementKeyConfigured: true,
+        managementKeyPersisted: true
+      },
+      managementKey: 'mgmt-secret'
+    })
+  )
+  const softwareConfig = {
+    ...managedSoftwareConfig(9444),
+    runtime: {
+      ...managedSoftwareConfig(9444).runtime,
+      timeoutMs: 7500
+    }
+  }
+  const seenOptions: Array<{
+    baseUrl?: string
+    managementKey?: string
+    timeoutMs?: number
+  }> = []
+  const service = createRuntimeService({
+    settingsStore: store,
+    allmoneConfigStore: createFakeAllmoneConfigStore(softwareConfig),
+    cliProxyApiConfigWriter: {
+      async writeManagedConfig() {
+        return softwareConfig
+      },
+      async saveOutputPort() {
+        return softwareConfig
+      }
+    },
+    createClient(options) {
+      seenOptions.push(options)
+      return createFakeClient()
+    }
+  })
+
+  await service.initialize()
+
+  assert.deepEqual(seenOptions.at(-1), {
+    baseUrl: 'http://127.0.0.1:9444/v0/management',
+    managementKey: 'mgmt-secret',
+    timeoutMs: 7500
+  })
+  assert.equal(service.getState().connection.timeoutMs, 7500)
 })
 
 test('saves managed output ports, rebuilds the runtime client, and restarts managed processes', async () => {
@@ -378,7 +433,7 @@ test('routes managed process commands through the process controller', async () 
     'ensureInstalledThenStart',
     'start',
     'restart',
-    'stop',
+    'shutdownAll',
     'checkForUpdate'
   ])
   assert.equal(service.getState().managed?.status, 'ready')

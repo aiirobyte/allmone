@@ -12,7 +12,7 @@ export interface RuntimeHomePaths {
   runtimeLogsDir: string
   runtimeTmpDir: string
   runtimeConfigPath: string
-  runtimeSettingsPath: string
+  managementKeyPath: string
   installMetadataPath: string
   cliProxyApiExecutablePath: string
 }
@@ -28,7 +28,7 @@ export function resolveRuntimeHome(
   const homeDir = options.homeDir ?? homedir()
   const platform = options.platform ?? process.platform
   const rootDir = join(homeDir, '.allmone')
-  const runtimeDir = join(rootDir, 'runtime')
+  const runtimeDir = join(rootDir, 'runtime', 'cli-proxy-api')
   const runtimeBinDir = join(runtimeDir, 'bin')
   const executableName =
     platform === 'win32' ? 'cli-proxy-api.exe' : 'cli-proxy-api'
@@ -43,7 +43,7 @@ export function resolveRuntimeHome(
     runtimeLogsDir: join(runtimeDir, 'logs'),
     runtimeTmpDir: join(runtimeDir, 'tmp'),
     runtimeConfigPath: join(runtimeDir, 'config.yaml'),
-    runtimeSettingsPath: join(runtimeDir, 'runtime-settings.json'),
+    managementKeyPath: join(runtimeDir, 'management-key.json'),
     installMetadataPath: join(runtimeDir, 'install.json'),
     cliProxyApiExecutablePath: join(runtimeBinDir, executableName)
   }

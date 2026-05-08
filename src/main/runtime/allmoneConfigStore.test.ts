@@ -28,13 +28,12 @@ function defaultConfigYaml(overrides: string): string {
 cliproxyapi:
   releaseMetadataUrl: ${CLI_PROXY_API_DEFAULT_RELEASE_METADATA_URL}
   releasePageUrl: ${CLI_PROXY_API_DEFAULT_RELEASE_PAGE_URL}
-  localExecutablePath: ~/.allmone/runtime/bin/cli-proxy-api
-runtime:
-  host: 127.0.0.1
-  port: 8317
-  configPath: ~/.allmone/runtime/config.yaml
-  apiBaseUrl: http://127.0.0.1:8317/v1
-  managementBaseUrl: http://127.0.0.1:8317/v0/management
+  localExecutablePath: ~/.allmone/runtime/cli-proxy-api/bin/cli-proxy-api
+  runtime:
+    host: 127.0.0.1
+    port: 8317
+    timeoutMs: 5000
+    configPath: ~/.allmone/runtime/cli-proxy-api/config.yaml
 ${overrides}`
 }
 
@@ -59,14 +58,19 @@ test('creates default non-secret YAML software config under runtime home', async
     assert.equal(config.cliproxyapi.localExecutablePath, runtimeHome.cliProxyApiExecutablePath)
     assert.equal(config.runtime.host, '127.0.0.1')
     assert.equal(config.runtime.port, 8317)
+    assert.equal(config.runtime.timeoutMs, 5000)
     assert.equal(config.runtime.configPath, runtimeHome.runtimeConfigPath)
     assert.equal(config.runtime.apiBaseUrl, 'http://127.0.0.1:8317/v1')
     assert.equal(
       config.runtime.managementBaseUrl,
       'http://127.0.0.1:8317/v0/management'
     )
-    assert.equal(parsed.cliproxyapi.localExecutablePath, '~/.allmone/runtime/bin/cli-proxy-api')
-    assert.equal(parsed.runtime.configPath, '~/.allmone/runtime/config.yaml')
+    assert.equal(parsed.cliproxyapi.localExecutablePath, '~/.allmone/runtime/cli-proxy-api/bin/cli-proxy-api')
+    assert.equal(parsed.cliproxyapi.runtime.timeoutMs, 5000)
+    assert.equal(parsed.cliproxyapi.runtime.configPath, '~/.allmone/runtime/cli-proxy-api/config.yaml')
+    assert(!('runtime' in parsed))
+    assert(!('apiBaseUrl' in parsed.cliproxyapi.runtime))
+    assert(!('managementBaseUrl' in parsed.cliproxyapi.runtime))
     assert(!raw.includes('managementKey'))
     assert(!raw.includes('api-key'))
     assert(!raw.includes('password'))
@@ -89,7 +93,28 @@ test('normalizes invalid stored ports back to the default port', async () => {
 
     assert.equal(config.runtime.port, 8317)
     assert.equal(config.runtime.apiBaseUrl, 'http://127.0.0.1:8317/v1')
-    assert.equal(parsed.runtime.port, 8317)
+    assert(!('apiBaseUrl' in parsed.cliproxyapi.runtime))
+    assert(!('managementBaseUrl' in parsed.cliproxyapi.runtime))
+    assert.equal(parsed.cliproxyapi.runtime.port, 8317)
+  })
+})
+
+test('normalizes invalid stored runtime timeouts back to the default timeout', async () => {
+  await withTempRuntimeHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
+
+    await ensureRuntimeHome(runtimeHome)
+    await writeFile(
+      runtimeHome.configPath,
+      defaultConfigYaml('').replace('timeoutMs: 5000', 'timeoutMs: invalid')
+    )
+
+    const store = createAllmoneConfigStore({ runtimeHome })
+    const config = await store.load()
+    const parsed = parse(await readFile(runtimeHome.configPath, 'utf8'))
+
+    assert.equal(config.runtime.timeoutMs, 5000)
+    assert.equal(parsed.cliproxyapi.runtime.timeoutMs, 5000)
   })
 })
 
@@ -101,7 +126,7 @@ test('rejects configured executable paths outside the managed runtime bin', asyn
     await writeFile(
       runtimeHome.configPath,
       defaultConfigYaml('').replace(
-        'localExecutablePath: ~/.allmone/runtime/bin/cli-proxy-api',
+        'localExecutablePath: ~/.allmone/runtime/cli-proxy-api/bin/cli-proxy-api',
         'localExecutablePath: /tmp/cli-proxy-api'
       )
     )
@@ -131,7 +156,7 @@ test('rejects invalid release metadata URLs', async () => {
   })
 })
 
-test('preserves userData runtime settings while keeping software config secret-free', async () => {
+test('keeps software config secret-free when old userData runtime settings exist', async () => {
   await withTempRuntimeHome(async (homeDir) => {
     const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
     const oldUserDataDir = join(homeDir, 'old-user-data')
@@ -153,15 +178,13 @@ test('preserves userData runtime settings while keeping software config secret-f
       )
     )
 
-    const store = createAllmoneConfigStore({
-      runtimeHome,
-      oldSettingsFilePath
-    })
+    const store = createAllmoneConfigStore({ runtimeHome })
     const config = await store.load()
     const raw = await readFile(runtimeHome.configPath, 'utf8')
 
     assert.equal(config.runtime.host, '127.0.0.1')
     assert.equal(config.runtime.port, 8317)
+    assert.equal(config.runtime.timeoutMs, 5000)
     assert.equal(config.runtime.apiBaseUrl, 'http://127.0.0.1:8317/v1')
     assert.equal(
       config.runtime.managementBaseUrl,

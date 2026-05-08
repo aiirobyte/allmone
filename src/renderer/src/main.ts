@@ -32,7 +32,7 @@ type ConfigLoadResult = {
   error: string | null
 }
 
-type SafeEndpointKind = 'management' | 'origin' | 'api'
+type SafeEndpointKind = 'api'
 
 type ViewState = {
   appVersion: string
@@ -66,6 +66,8 @@ const state: ViewState = {
   error: null
 }
 
+let managedStateRefreshTimer: number | undefined
+
 void bootstrap()
 
 async function bootstrap(): Promise<void> {
@@ -76,18 +78,29 @@ async function bootstrap(): Promise<void> {
       window.allmone.app.getVersion(),
       window.allmone.runtime.getState()
     ])
-    const config = await loadConfigSummary()
 
     state.appVersion = appVersion
     state.runtimeState = runtimeState
-    state.configSummary = config.summary
-    state.configLoadError = config.error
     state.error = null
+
+    const check = await window.allmone.runtime.testConnection()
+    state.runtimeState = await window.allmone.runtime.getState()
+
+    if (check.state === 'reachable') {
+      const config = await loadConfigSummary()
+
+      state.configSummary = config.summary
+      state.configLoadError = config.error
+    } else {
+      state.configSummary = null
+      state.configLoadError = null
+    }
   } catch (error) {
     state.error = toMessage(error)
   } finally {
     state.busyAction = null
     render()
+    scheduleManagedStateRefresh()
   }
 }
 
@@ -113,9 +126,9 @@ function render(): void {
           <p class="eyebrow">allmone ${escapeHtml(state.appVersion || '0.1.3')}</p>
           <h1>Runtime Control</h1>
         </div>
-        <div class="status-pill ${statusClass(state.runtimeState?.status)}">
+        <div class="status-pill ${managedStatusClass(state.runtimeState?.managed?.status)}">
           <span class="status-dot"></span>
-          ${escapeHtml(statusLabel(state.runtimeState?.status))}
+          ${escapeHtml(managedStatusLabel(state.runtimeState?.managed?.status))}
         </div>
       </header>
 
@@ -123,27 +136,16 @@ function render(): void {
 
       ${renderManagedRuntimePanel()}
 
-      <div class="layout">
-        <section class="surface connection-surface">
-          <div class="section-heading">
-            <h2>Connection</h2>
-            <span>${escapeHtml(connectionKeyLabel())}</span>
-          </div>
-          ${renderConnectionForm()}
-          ${renderStatusPanel()}
-        </section>
-
-        <section class="surface provider-surface">
-          <div class="section-heading">
-            <h2>OpenAI-Compatible Providers</h2>
-            <span>${providerCountLabel()}</span>
-          </div>
-          <div class="provider-grid">
-            ${renderProviderList()}
-            ${renderProviderForm()}
-          </div>
-        </section>
-      </div>
+      <section class="surface provider-surface">
+        <div class="section-heading">
+          <h2>OpenAI-Compatible Providers</h2>
+          <span>${providerCountLabel()}</span>
+        </div>
+        <div class="provider-grid">
+          ${renderProviderList()}
+          ${renderProviderForm()}
+        </div>
+      </section>
     </section>
   `
 
@@ -199,6 +201,9 @@ function renderManagedRuntimePanel(): string {
         </form>
 
         <div class="managed-actions">
+          <button type="button" data-action="test-connection" ${isBusy('test-connection')}>
+            Test
+          </button>
           <button type="button" data-action="install-update" ${isBusy('install-update')}>
             Install / Retry
           </button>
@@ -241,6 +246,7 @@ function renderManagedRuntimePanel(): string {
       </div>
 
       ${managed?.lastError ? renderDiagnostic(managed.lastError) : ''}
+      ${renderStatusPanel()}
       <div class="copy-panel">
         ${renderCopyRow('API Base', apiBaseUrl || null, 'api')}
       </div>
@@ -248,63 +254,8 @@ function renderManagedRuntimePanel(): string {
   `
 }
 
-function renderConnectionForm(): string {
-  const connection = state.runtimeState?.connection
-
-  return `
-    <form id="connection-form" class="form-grid">
-      <label>
-        <span>Management URL</span>
-        <input
-          name="baseUrl"
-          type="url"
-          spellcheck="false"
-          value="${escapeHtml(connection?.baseUrl ?? 'http://localhost:8317/v0/management')}"
-          required
-        />
-      </label>
-      <label>
-        <span>Timeout</span>
-        <input
-          name="timeoutMs"
-          type="number"
-          min="500"
-          step="500"
-          value="${connection?.timeoutMs ?? 5000}"
-          required
-        />
-      </label>
-      <label class="full-row">
-        <span>Management Key</span>
-        <input
-          name="managementKey"
-          type="password"
-          autocomplete="off"
-          placeholder="${connection?.managementKeyConfigured ? 'Saved key is kept in main process' : 'Required by CLIProxyAPI'}"
-        />
-      </label>
-      <label class="checkbox-row">
-        <input name="clearManagementKey" type="checkbox" />
-        <span>Clear saved key</span>
-      </label>
-      <div class="button-row">
-        <button type="submit" ${isBusy('save-connection')}>Save</button>
-        <button type="button" data-action="test-connection" ${isBusy('test-connection')}>
-          Test
-        </button>
-        <button type="button" data-action="refresh-config" ${isBusy('refresh-config')}>
-          Refresh
-        </button>
-      </div>
-    </form>
-  `
-}
-
 function renderStatusPanel(): string {
   const runtime = state.runtimeState
-  const connection = runtime?.connection
-  const managementUrl = getSafeEndpoint('management')
-  const serviceOrigin = getSafeEndpoint('origin')
 
   return `
     <div class="state-action ${statusClass(runtime?.status)}">
@@ -339,11 +290,6 @@ function renderStatusPanel(): string {
       </div>
     </dl>
     ${runtime?.lastError ? renderDiagnostic(runtime.lastError) : ''}
-    <div class="copy-panel">
-      ${renderCopyRow('Management URL', managementUrl, 'management')}
-      ${renderCopyRow('Service Origin', serviceOrigin, 'origin')}
-    </div>
-    ${connection && !managementUrl ? '<p class="inline-warning">Management URL is not a valid URL.</p>' : ''}
   `
 }
 
@@ -357,7 +303,7 @@ function renderFirstLaunchHint(): string {
   return `
     <div class="empty-callout">
       <strong>No management key saved</strong>
-      <span>Enter the CLIProxyAPI management key, save, then test.</span>
+      <span>Configure the CLIProxyAPI management key outside the renderer, then test.</span>
     </div>
   `
 }
@@ -561,39 +507,10 @@ function bindEventHandlers(): void {
     .querySelector<HTMLFormElement>('#managed-runtime-form')
     ?.addEventListener('submit', onManagedRuntimeSubmit)
   document
-    .querySelector<HTMLFormElement>('#connection-form')
-    ?.addEventListener('submit', onConnectionSubmit)
-  document
     .querySelector<HTMLFormElement>('#provider-form')
     ?.addEventListener('submit', onProviderSubmit)
   document.querySelectorAll<HTMLElement>('[data-action]').forEach((element) => {
     element.addEventListener('click', onActionClick)
-  })
-}
-
-async function onConnectionSubmit(event: SubmitEvent): Promise<void> {
-  event.preventDefault()
-  const form = event.currentTarget
-
-  if (!(form instanceof HTMLFormElement)) {
-    return
-  }
-
-  const data = new FormData(form)
-  const managementKey = stringValue(data.get('managementKey')).trim()
-
-  await runAction('save-connection', async () => {
-    state.runtimeState = await window.allmone.runtime.saveConnectionSettings({
-      baseUrl: stringValue(data.get('baseUrl')).trim(),
-      timeoutMs: Number(data.get('timeoutMs')),
-      managementKey: managementKey || undefined,
-      clearManagementKey: data.get('clearManagementKey') === 'on'
-    })
-    state.configSummary = null
-    state.configLoadError = null
-    state.providerDraft = emptyProviderDraft()
-    state.selectedProviderName = null
-    state.notice = 'Connection settings saved'
   })
 }
 
@@ -666,13 +583,18 @@ function onActionClick(event: Event): void {
     case 'test-connection':
       void testConnection()
       break
-    case 'refresh-config':
-      void refreshConfig()
-      break
     case 'install-update':
       void managedCommand(
         'install-update',
-        () => window.allmone.runtime.ensureInstalledThenStart(),
+        async () => {
+          const updateState = await window.allmone.runtime.checkForUpdate()
+
+          if (updateState.managed?.lastError) {
+            return updateState
+          }
+
+          return await window.allmone.runtime.startManagedRuntime()
+        },
         'Install/start requested'
       )
       break
@@ -741,6 +663,11 @@ async function managedCommand(
 ): Promise<void> {
   await runAction(action, async () => {
     state.runtimeState = await command()
+    if (state.runtimeState.managed?.lastError) {
+      state.error = state.runtimeState.managed.lastError
+      return
+    }
+
     state.notice = notice
   })
 }
@@ -760,54 +687,14 @@ async function testConnection(): Promise<void> {
   })
 }
 
-async function refreshConfig(): Promise<void> {
-  await runAction('refresh-config', async () => {
-    const check = await window.allmone.runtime.testConnection()
-
-    state.runtimeState = await window.allmone.runtime.getState()
-    state.configSummary = null
-    state.configLoadError = null
-
-    if (check.state !== 'reachable') {
-      throw new Error(nextActionForStatus(check.state))
-    }
-
-    const config = await loadConfigSummary()
-    state.configSummary = config.summary
-    state.configLoadError = config.error
-
-    if (config.error) {
-      throw new Error(`Config refresh failed: ${config.error}`)
-    }
-
-    state.notice = 'Configuration refreshed'
-  })
-}
-
 async function copyEndpoint(kind: string | undefined): Promise<void> {
-  if (kind !== 'management' && kind !== 'origin' && kind !== 'api') {
+  if (kind !== 'api') {
     return
   }
 
   await runAction(`copy:${kind}`, async () => {
-    if (kind === 'api') {
-      const result = await window.allmone.runtime.copyApiBase()
-      state.notice = `Copied ${result.value}`
-      return
-    }
-
-    const value = getSafeEndpoint(kind)
-
-    if (!value) {
-      throw new Error('Endpoint is unavailable')
-    }
-
-    if (!navigator.clipboard?.writeText) {
-      throw new Error('Clipboard is unavailable')
-    }
-
-    await navigator.clipboard.writeText(value)
-    state.notice = `Copied ${kind === 'management' ? 'Management URL' : 'Service Origin'}`
+    const result = await window.allmone.runtime.copyApiBase()
+    state.notice = `Copied ${result.value}`
   })
 }
 
@@ -875,7 +762,28 @@ async function runAction(
   } finally {
     state.busyAction = null
     render()
+    scheduleManagedStateRefresh()
   }
+}
+
+function scheduleManagedStateRefresh(): void {
+  if (!isManagedBusy() || managedStateRefreshTimer) {
+    return
+  }
+
+  managedStateRefreshTimer = window.setTimeout(async () => {
+    managedStateRefreshTimer = undefined
+
+    try {
+      state.runtimeState = await window.allmone.runtime.getState()
+      state.error = null
+    } catch (error) {
+      state.error = toMessage(error)
+    } finally {
+      render()
+      scheduleManagedStateRefresh()
+    }
+  }, 1_000)
 }
 
 function readProviderDraftFromForm(): ProviderDraft {
@@ -963,7 +871,7 @@ function managedStatusLabel(status: string | undefined): string {
     case 'installing':
       return 'Installing'
     case 'ready':
-      return 'Ready'
+      return 'Not started'
     case 'starting':
       return 'Starting'
     case 'running':
@@ -971,15 +879,15 @@ function managedStatusLabel(status: string | undefined): string {
     case 'stopping':
       return 'Stopping'
     case 'stopped':
-      return 'Stopped'
+      return 'Not started'
     case 'crashed':
-      return 'Crashed'
+      return 'Not started'
     case 'update_failed':
-      return 'Update Failed'
+      return 'Not installed'
     case 'launch_failed':
-      return 'Launch Failed'
+      return 'Not started'
     default:
-      return 'Missing'
+      return 'Not installed'
   }
 }
 
@@ -1000,7 +908,7 @@ function nextActionForStatus(status: RuntimeState['status'] | undefined): string
     case 'unexpected_error':
       return 'Review the redacted diagnostic, then retry.'
     default:
-      return 'Loading local runtime settings.'
+      return 'Loading local runtime state.'
   }
 }
 
@@ -1021,6 +929,24 @@ function statusClass(status: RuntimeState['status'] | undefined): string {
   }
 }
 
+function managedStatusClass(status: string | undefined): string {
+  switch (status) {
+    case 'running':
+      return 'status-ok'
+    case 'installing':
+    case 'starting':
+    case 'stopping':
+      return 'status-warn'
+    case 'ready':
+    case 'stopped':
+    case 'crashed':
+    case 'launch_failed':
+    case 'update_failed':
+    default:
+      return 'status-error'
+  }
+}
+
 function isRuntimeReachable(): boolean {
   return state.runtimeState?.status === 'reachable'
 }
@@ -1035,33 +961,6 @@ function canStartManagedRuntime(): boolean {
   const status = state.runtimeState?.managed?.status
 
   return !isManagedBusy() && status !== 'running'
-}
-
-function getSafeEndpoint(kind: SafeEndpointKind): string | null {
-  const baseUrl = state.runtimeState?.connection.baseUrl.trim()
-
-  if (!baseUrl) {
-    return null
-  }
-
-  const url = toSafeUrl(baseUrl)
-
-  if (!url) {
-    return null
-  }
-
-  return kind === 'origin' ? url.origin : url.toString()
-}
-
-function toSafeUrl(value: string): URL | null {
-  try {
-    const url = new URL(value)
-    url.username = ''
-    url.password = ''
-    return url
-  } catch {
-    return null
-  }
 }
 
 function formatCheckedAt(value: string | undefined): string {

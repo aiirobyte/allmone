@@ -21,29 +21,41 @@ test('resolves all managed runtime paths from the user home directory', () => {
 
   assert.equal(paths.rootDir, join(homeDir, '.allmone'))
   assert.equal(paths.configPath, join(homeDir, '.allmone', 'config.yaml'))
-  assert.equal(paths.runtimeDir, join(homeDir, '.allmone', 'runtime'))
-  assert.equal(paths.runtimeBinDir, join(homeDir, '.allmone', 'runtime', 'bin'))
+  assert.equal(
+    paths.runtimeDir,
+    join(homeDir, '.allmone', 'runtime', 'cli-proxy-api')
+  )
+  assert.equal(
+    paths.runtimeBinDir,
+    join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'bin')
+  )
   assert.equal(
     paths.runtimeDownloadsDir,
-    join(homeDir, '.allmone', 'runtime', 'downloads')
+    join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'downloads')
   )
-  assert.equal(paths.runtimeLogsDir, join(homeDir, '.allmone', 'runtime', 'logs'))
-  assert.equal(paths.runtimeTmpDir, join(homeDir, '.allmone', 'runtime', 'tmp'))
+  assert.equal(
+    paths.runtimeLogsDir,
+    join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'logs')
+  )
+  assert.equal(
+    paths.runtimeTmpDir,
+    join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'tmp')
+  )
   assert.equal(
     paths.runtimeConfigPath,
-    join(homeDir, '.allmone', 'runtime', 'config.yaml')
+    join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'config.yaml')
   )
   assert.equal(
-    paths.runtimeSettingsPath,
-    join(homeDir, '.allmone', 'runtime', 'runtime-settings.json')
+    paths.managementKeyPath,
+    join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'management-key.json')
   )
   assert.equal(
     paths.installMetadataPath,
-    join(homeDir, '.allmone', 'runtime', 'install.json')
+    join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'install.json')
   )
   assert.equal(
     paths.cliProxyApiExecutablePath,
-    join(homeDir, '.allmone', 'runtime', 'bin', 'cli-proxy-api')
+    join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'bin', 'cli-proxy-api')
   )
 })
 
@@ -66,7 +78,7 @@ test('creates the runtime home directory tree', async () => {
 
     assert.equal(
       paths.cliProxyApiExecutablePath,
-      join(homeDir, '.allmone', 'runtime', 'bin', 'cli-proxy-api.exe')
+      join(homeDir, '.allmone', 'runtime', 'cli-proxy-api', 'bin', 'cli-proxy-api.exe')
     )
   })
 })

@@ -60,12 +60,13 @@ function createFakeService(): RuntimeService & {
               'https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest',
             releasePageUrl:
               'https://github.com/router-for-me/CLIProxyAPI/releases/latest',
-            localExecutablePath: '/tmp/allmone/runtime/bin/cli-proxy-api'
+            localExecutablePath: '/tmp/allmone/runtime/cli-proxy-api/bin/cli-proxy-api'
           },
           runtime: {
             host: '127.0.0.1',
             port: 8317,
-            configPath: '/tmp/allmone/runtime/config.yaml',
+            timeoutMs: 5000,
+            configPath: '/tmp/allmone/runtime/cli-proxy-api/config.yaml',
             apiBaseUrl: 'http://127.0.0.1:8317/v1',
             managementBaseUrl: 'http://127.0.0.1:8317/v0/management'
           }
@@ -162,21 +163,17 @@ test('registers the centralized runtime IPC channels', () => {
   ].sort())
 })
 
-test('passes valid connection payloads to the runtime service', async () => {
+test('passes valid management key payloads to the runtime service', async () => {
   const ipc = createFakeIpcMain()
   const service = createFakeService()
   registerRuntimeIpcHandlers({ ipcMain: ipc.ipcMain, runtimeService: service })
 
   await ipc.invoke(RUNTIME_IPC_CHANNELS.saveConnection, {
-    baseUrl: 'http://localhost:9000/v0/management',
-    managementKey: 'mgmt-secret',
-    timeoutMs: 2500
+    managementKey: 'mgmt-secret'
   })
 
   assert.deepEqual(service.savedPayloads[0], {
-    baseUrl: 'http://localhost:9000/v0/management',
-    managementKey: 'mgmt-secret',
-    timeoutMs: 2500
+    managementKey: 'mgmt-secret'
   })
 })
 
@@ -188,7 +185,7 @@ test('rejects invalid IPC payloads without echoing secret values', async () => {
   await assert.rejects(
     async () => {
       await ipc.invoke(RUNTIME_IPC_CHANNELS.saveConnection, {
-        baseUrl: 42,
+        timeoutMs: 2500,
         managementKey: 'mgmt-secret'
       })
     },

@@ -120,26 +120,14 @@ function validateConnectionPayload(
   value: unknown
 ): RuntimeConnectionSettingsInput {
   assertRecord(value)
-  assertOptionalString(value.baseUrl)
   assertOptionalString(value.managementKey)
   assertOptionalBoolean(value.clearManagementKey)
 
-  if (
-    value.timeoutMs !== undefined &&
-    (typeof value.timeoutMs !== 'number' || !Number.isFinite(value.timeoutMs))
-  ) {
+  if ('baseUrl' in value || 'timeoutMs' in value) {
     throwInvalidPayload()
   }
 
   const input: RuntimeConnectionSettingsInput = {}
-
-  if (typeof value.baseUrl === 'string') {
-    input.baseUrl = value.baseUrl
-  }
-
-  if (typeof value.timeoutMs === 'number') {
-    input.timeoutMs = value.timeoutMs
-  }
 
   if (typeof value.managementKey === 'string') {
     input.managementKey = value.managementKey

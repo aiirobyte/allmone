@@ -6,7 +6,8 @@ import type { CliProxyApiConfigWriter } from './cliproxyapiConfigWriter'
 import {
   createCliProxyApiProcessController,
   type CliProxyApiChildProcess,
-  type CliProxyApiProcessSpawnAdapter
+  type CliProxyApiProcessSpawnAdapter,
+  type ManagedCliProxyApiProcess
 } from './cliproxyapiProcessController'
 import type { CliProxyApiInstaller } from './cliproxyapiInstaller'
 import { resolveRuntimeHome } from './runtimeHome'
@@ -28,13 +29,21 @@ function createHarness(options: {
     status: 'installed' | 'updated' | 'up_to_date' | 'existing'
     version?: string
   }
+  executableExists?: boolean | (() => Promise<boolean>)
+  onEnsureInstalledStart?: () => void
   managementKey?: string
+  portOccupants?:
+    | ManagedCliProxyApiProcess[]
+    | ((call: number) => ManagedCliProxyApiProcess[])
+  managedProcesses?: ManagedCliProxyApiProcess[]
 } = {}) {
   const runtimeHome = resolveRuntimeHome({
     homeDir: '/tmp/allmone-process-home',
     platform: 'darwin'
   })
   const children: FakeChildProcess[] = []
+  const killedPids: number[] = []
+  let inspectPortCalls = 0
   const spawnCalls: Array<{
     command: string
     args: string[]
@@ -55,6 +64,7 @@ function createHarness(options: {
     runtime: {
       host: '127.0.0.1',
       port: 8317,
+      timeoutMs: 5000,
       configPath: runtimeHome.runtimeConfigPath,
       apiBaseUrl: 'http://127.0.0.1:8317/v1',
       managementBaseUrl: 'http://127.0.0.1:8317/v0/management'
@@ -78,6 +88,8 @@ function createHarness(options: {
   }
   const installer: CliProxyApiInstaller = {
     async ensureInstalled() {
+      options.onEnsureInstalledStart?.()
+
       if (options.installerFails) {
         throw options.installerFails
       }
@@ -120,7 +132,24 @@ function createHarness(options: {
     configWriter,
     installer,
     spawn,
+    executableExists: async () =>
+      typeof options.executableExists === 'function'
+        ? await options.executableExists()
+        : options.executableExists ?? true,
     getManagementKey: async () => options.managementKey ?? 'mgmt-secret',
+    inspectPort: async () => {
+      inspectPortCalls += 1
+
+      if (typeof options.portOccupants === 'function') {
+        return options.portOccupants(inspectPortCalls)
+      }
+
+      return options.portOccupants ?? []
+    },
+    findManagedProcesses: async () => options.managedProcesses ?? [],
+    killProcess: async (pid) => {
+      killedPids.push(pid)
+    },
     now: () => new Date('2026-05-08T00:00:00.000Z')
   })
 
@@ -128,7 +157,11 @@ function createHarness(options: {
     controller,
     runtimeHome,
     children,
-    spawnCalls
+    spawnCalls,
+    killedPids,
+    get inspectPortCalls() {
+      return inspectPortCalls
+    }
   }
 }
 
@@ -155,6 +188,50 @@ test('starts the managed CLIProxyAPI binary with config path and management pass
     }
   ])
   assert(!JSON.stringify(state).includes('mgmt-secret'))
+})
+
+test('reports the occupying process when the managed port is already in use', async () => {
+  const harness = createHarness({
+    portOccupants: [
+      {
+        pid: 88260,
+        command:
+          '/Users/aiirobyte/.allmone/runtime/cli-proxy-api/bin/cli-proxy-api --config /Users/aiirobyte/.allmone/runtime/cli-proxy-api/config.yaml'
+      }
+    ]
+  })
+
+  const state = await harness.controller.start()
+
+  assert.equal(state.status, 'launch_failed')
+  assert.equal(harness.spawnCalls.length, 0)
+  assert.match(state.lastError ?? '', /Port 8317 on 127\.0\.0\.1 is already in use/)
+  assert.match(state.lastError ?? '', /PID 88260/)
+  assert.match(state.lastError ?? '', /Output Port/)
+  assert.match(state.lastError ?? '', /cli-proxy-api/)
+})
+
+test('cleans up matching managed port occupants before starting', async () => {
+  const matchingCommand =
+    '/tmp/allmone-process-home/.allmone/runtime/cli-proxy-api/bin/cli-proxy-api --config /tmp/allmone-process-home/.allmone/runtime/cli-proxy-api/config.yaml'
+  const harness = createHarness({
+    portOccupants: (call) =>
+      call === 1
+        ? [
+            {
+              pid: 88260,
+              command: matchingCommand
+            }
+          ]
+        : []
+  })
+
+  const state = await harness.controller.start()
+
+  assert.equal(state.status, 'running')
+  assert.equal(harness.inspectPortCalls, 2)
+  assert.deepEqual(harness.killedPids, [88260])
+  assert.equal(harness.spawnCalls.length, 1)
 })
 
 test('does not spawn twice when start is called while already running', async () => {
@@ -187,6 +264,32 @@ test('stops a running process and records the exit state', async () => {
   assert.equal(harness.children[0]?.killedWith, 'SIGTERM')
   assert.equal(state.status, 'stopped')
   assert.equal(state.lastExitCode, 0)
+})
+
+test('shutdown stops the tracked child and kills other managed CLIProxyAPI processes', async () => {
+  const harness = createHarness({
+    managedProcesses: [
+      {
+        pid: 2222,
+        command:
+          '/tmp/allmone-process-home/.allmone/runtime/cli-proxy-api/bin/cli-proxy-api --config /tmp/allmone-process-home/.allmone/runtime/cli-proxy-api/config.yaml'
+      },
+      {
+        pid: 3333,
+        command:
+          '/tmp/allmone-process-home/.allmone/runtime/cli-proxy-api/bin/cli-proxy-api --config /tmp/allmone-process-home/.allmone/runtime/cli-proxy-api/config.yaml'
+      }
+    ]
+  })
+
+  await harness.controller.start()
+  const shutdownPromise = harness.controller.shutdownAll()
+  harness.children[0]?.emit('exit', 0, null)
+  const state = await shutdownPromise
+
+  assert.equal(state.status, 'stopped')
+  assert.equal(harness.children[0]?.killedWith, 'SIGTERM')
+  assert.deepEqual(harness.killedPids, [2222, 3333])
 })
 
 test('restart stops the current process before starting a new one', async () => {
@@ -236,6 +339,51 @@ test('ensureInstalledThenStart installs before launching and records install met
   assert.equal(state.install?.status, 'existing')
   assert.equal(state.install?.version, 'v6.9.0')
   assert.equal(harness.spawnCalls.length, 1)
+})
+
+test('ensureInstalledThenStart reports starting while validating an existing executable', async () => {
+  let observedStatus: string | undefined
+  const harness = createHarness({
+    executableExists: true,
+    onEnsureInstalledStart() {
+      observedStatus = harness.controller.getState().status
+    }
+  })
+
+  await harness.controller.ensureInstalledThenStart()
+
+  assert.equal(observedStatus, 'starting')
+})
+
+test('ensureInstalledThenStart enters starting immediately before install validation finishes', async () => {
+  let resolveExecutableExists: (value: boolean) => void = () => {}
+  const executableExistsPromise = new Promise<boolean>((resolve) => {
+    resolveExecutableExists = resolve
+  })
+  const harness = createHarness({
+    executableExists: async () => await executableExistsPromise
+  })
+
+  const startPromise = harness.controller.ensureInstalledThenStart()
+
+  assert.equal(harness.controller.getState().status, 'starting')
+
+  resolveExecutableExists(true)
+  await startPromise
+})
+
+test('ensureInstalledThenStart reports installing only when the executable is missing', async () => {
+  let observedStatus: string | undefined
+  const harness = createHarness({
+    executableExists: false,
+    onEnsureInstalledStart() {
+      observedStatus = harness.controller.getState().status
+    }
+  })
+
+  await harness.controller.ensureInstalledThenStart()
+
+  assert.equal(observedStatus, 'installing')
 })
 
 test('ensureInstalledThenStart records update failures without launching', async () => {

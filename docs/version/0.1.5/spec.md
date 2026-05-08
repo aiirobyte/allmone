@@ -37,8 +37,11 @@ v0.1.5 assumes v0.1.4 is complete:
 
 - allmone creates and owns `~/.allmone`.
 - allmone stores non-secret software settings in `~/.allmone/config.yaml`.
-- allmone installs and updates the managed CLIProxyAPI binary under `~/.allmone/runtime/bin/`.
-- allmone writes and preserves `~/.allmone/runtime/config.yaml`.
+- allmone stores CLIProxyAPI runtime settings under `cliproxyapi.runtime` in `~/.allmone/config.yaml`; the old top-level `runtime` block is not supported.
+- allmone stores the encrypted Management API credential in `~/.allmone/runtime/cli-proxy-api/management-key.json`.
+- allmone derives the Management API base URL and timeout from `~/.allmone/config.yaml`.
+- allmone installs and updates the managed CLIProxyAPI binary under `~/.allmone/runtime/cli-proxy-api/bin/`.
+- allmone writes and preserves `~/.allmone/runtime/cli-proxy-api/config.yaml`.
 - allmone launches, restarts, stops, and tracks the managed CLIProxyAPI process.
 - allmone owns the local output port and exposes the safe API base URL.
 - allmone has tray controls and a compact managed-runtime renderer panel.
@@ -99,7 +102,7 @@ v0.1.5 should show these as supported upstream families, list their existing aut
 v0.1.5 should add an allmone-owned CLIProxyAPI auth directory:
 
 ```text
-~/.allmone/runtime/auth/
+~/.allmone/runtime/cli-proxy-api/auth/
 ```
 
 Rules:
@@ -137,7 +140,7 @@ Rules:
 - Add Amp integration configuration for the supported fields above.
 - Add account/OAuth upstream visibility through auth-file summaries.
 - Add explicit login/import handoffs for Gemini CLI, Antigravity, Claude Code, Codex, Kimi, and Vertex service-account import by running the managed CLIProxyAPI binary in the relevant one-shot mode with the allmone-owned config path.
-- Add and use `~/.allmone/runtime/auth` as the allmone-managed CLIProxyAPI `auth-dir`.
+- Add and use `~/.allmone/runtime/cli-proxy-api/auth` as the allmone-managed CLIProxyAPI `auth-dir`.
 - Preserve unknown CLIProxyAPI config fields and provider-specific fields that v0.1.5 does not edit.
 - Redact upstream API keys, local API keys, management keys, proxy credentials, bearer tokens, and sensitive headers before state crosses IPC.
 - Keep renderer durable storage free of secrets.

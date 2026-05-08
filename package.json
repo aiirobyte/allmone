@@ -6,7 +6,7 @@
   "author": "aiirobyte",
   "license": "MIT",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "env -u ELECTRON_RUN_AS_NODE electron-vite dev",
     "test": "bun test",
     "build": "bun run typecheck && electron-vite build",
     "preview": "electron-vite preview",
@@ -26,6 +26,7 @@
     },
     "files": [
       "out/**/*",
+      "assets/**/*",
       "package.json"
     ],
     "mac": {

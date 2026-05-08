@@ -84,22 +84,18 @@ export interface CliProxyApiInstallerOptions {
   platform?: string
   arch?: string
   fetchAdapter?: CliProxyApiFetchAdapter
+  metadataFetchTimeoutMs?: number
   fileSystem?: CliProxyApiFileSystemAdapter
   archiveAdapter?: CliProxyApiArchiveAdapter
+  readExecutableVersion?: (executablePath: string) => Promise<string | undefined>
   now?: () => Date
 }
 
 export interface CliProxyApiInstallMetadata {
   version: string
-  assetName: string
-  sourceUrl: string
-  releasePageUrl: string
-  releaseMetadataUrl: string
   executablePath: string
   checksumSha256?: string
-  installedAt: string
-  platform: string
-  arch: string
+  check_at: number
 }
 
 export type CliProxyApiInstallStatus =
@@ -255,8 +251,12 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
   private readonly platform: string
   private readonly arch: string
   private readonly fetchAdapter: CliProxyApiFetchAdapter
+  private readonly metadataFetchTimeoutMs: number
   private readonly fileSystem: CliProxyApiFileSystemAdapter
   private readonly archiveAdapter: CliProxyApiArchiveAdapter
+  private readonly readExecutableVersion: (
+    executablePath: string
+  ) => Promise<string | undefined>
   private readonly now: () => Date
 
   constructor(options: CliProxyApiInstallerOptions) {
@@ -265,12 +265,25 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
     this.platform = options.platform ?? process.platform
     this.arch = options.arch ?? process.arch
     this.fetchAdapter = options.fetchAdapter ?? defaultFetchAdapter
+    this.metadataFetchTimeoutMs = options.metadataFetchTimeoutMs ?? 15_000
     this.fileSystem = options.fileSystem ?? createNodeFileSystemAdapter()
     this.archiveAdapter = options.archiveAdapter ?? createNodeArchiveAdapter()
+    this.readExecutableVersion =
+      options.readExecutableVersion ?? defaultReadExecutableVersion
     this.now = options.now ?? (() => new Date())
   }
 
   async ensureInstalled(): Promise<CliProxyApiInstallResult> {
+    return await this.ensureInstalledInternal({ checkForUpdate: false })
+  }
+
+  async checkForUpdate(): Promise<CliProxyApiInstallResult> {
+    return await this.ensureInstalledInternal({ checkForUpdate: true })
+  }
+
+  private async ensureInstalledInternal(options: {
+    checkForUpdate: boolean
+  }): Promise<CliProxyApiInstallResult> {
     await ensureRuntimeHome(this.runtimeHome)
 
     const config = await this.configStore.load()
@@ -279,6 +292,21 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
       this.runtimeHome
     )
     const executableExists = await this.fileSystem.exists(executablePath)
+    const installMetadata = await this.readInstallMetadata()
+
+    if (!options.checkForUpdate && executableExists) {
+      const metadata =
+        installMetadata?.executablePath === executablePath
+          ? installMetadata
+          : await this.writeLocalExecutableMetadata({ executablePath })
+
+      return {
+        status: 'existing',
+        executablePath,
+        version: metadata.version,
+        checksumSha256: metadata.checksumSha256
+      }
+    }
 
     let metadata: CliProxyApiReleaseMetadata
 
@@ -288,9 +316,15 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
       )
     } catch (error) {
       if (executableExists) {
+        const installMetadata = await this.writeLocalExecutableMetadata({
+          executablePath
+        })
+
         return {
           status: 'existing',
           executablePath,
+          version: installMetadata.version,
+          checksumSha256: installMetadata.checksumSha256,
           metadataFetchError: toErrorMessage(error)
         }
       }
@@ -302,20 +336,49 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
       platform: this.platform,
       arch: this.arch
     })
-    const installMetadata = await this.readInstallMetadata()
+
+    if (!installMetadata && executableExists) {
+      const executableVersion = await this.readExecutableVersion(executablePath)
+
+      if (isSameVersion(executableVersion, metadata.tag_name)) {
+        const adoptedMetadata = await this.writeInstallMetadata({
+          config,
+          metadata,
+          asset,
+          executablePath,
+          checksumSha256: undefined
+        })
+
+        return {
+          status: 'up_to_date',
+          executablePath,
+          version: adoptedMetadata.version,
+          assetName: asset.name,
+          releasePageUrl: config.cliproxyapi.releasePageUrl,
+          checksumSha256: adoptedMetadata.checksumSha256
+        }
+      }
+    }
 
     if (
       executableExists &&
-      installMetadata?.version === metadata.tag_name &&
-      installMetadata.assetName === asset.name
+      installMetadata?.version === metadata.tag_name
     ) {
+      const refreshedMetadata = await this.writeInstallMetadata({
+        config,
+        metadata,
+        asset,
+        executablePath,
+        checksumSha256: installMetadata.checksumSha256
+      })
+
       return {
         status: 'up_to_date',
         executablePath,
-        version: installMetadata.version,
-        assetName: installMetadata.assetName,
-        releasePageUrl: installMetadata.releasePageUrl,
-        checksumSha256: installMetadata.checksumSha256
+        version: refreshedMetadata.version,
+        assetName: asset.name,
+        releasePageUrl: config.cliproxyapi.releasePageUrl,
+        checksumSha256: refreshedMetadata.checksumSha256
       }
     }
 
@@ -328,14 +391,14 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
     })
   }
 
-  async checkForUpdate(): Promise<CliProxyApiInstallResult> {
-    return await this.ensureInstalled()
-  }
-
   private async fetchReleaseMetadata(
     releaseMetadataUrl: string
   ): Promise<CliProxyApiReleaseMetadata> {
-    const response = await this.fetchAdapter(releaseMetadataUrl)
+    const response = await withTimeout(
+      this.fetchAdapter(releaseMetadataUrl),
+      this.metadataFetchTimeoutMs,
+      'CLIProxyAPI release metadata fetch timed out'
+    )
 
     if (!response.ok) {
       throw new Error(
@@ -387,30 +450,20 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
 
       await this.fileSystem.replaceFile(input.executablePath, stagedExecutablePath)
 
-      const installMetadata: CliProxyApiInstallMetadata = {
-        version: input.metadata.tag_name,
-        assetName: input.asset.name,
-        sourceUrl: input.asset.browser_download_url,
-        releasePageUrl: input.config.cliproxyapi.releasePageUrl,
-        releaseMetadataUrl: input.config.cliproxyapi.releaseMetadataUrl,
+      const installMetadata = await this.writeInstallMetadata({
+        config: input.config,
+        metadata: input.metadata,
+        asset: input.asset,
         executablePath: input.executablePath,
-        checksumSha256,
-        installedAt: this.now().toISOString(),
-        platform: this.platform,
-        arch: this.arch
-      }
-
-      await this.fileSystem.writeText(
-        this.runtimeHome.installMetadataPath,
-        `${JSON.stringify(installMetadata, null, 2)}\n`
-      )
+        checksumSha256
+      })
 
       return {
         status: input.status,
         executablePath: input.executablePath,
         version: installMetadata.version,
-        assetName: installMetadata.assetName,
-        releasePageUrl: installMetadata.releasePageUrl,
+        assetName: input.asset.name,
+        releasePageUrl: input.config.cliproxyapi.releasePageUrl,
         checksumSha256
       }
     } finally {
@@ -422,7 +475,11 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
   }
 
   private async downloadBytes(url: string): Promise<Uint8Array> {
-    const response = await this.fetchAdapter(url)
+    const response = await withTimeout(
+      this.fetchAdapter(url),
+      this.metadataFetchTimeoutMs,
+      'CLIProxyAPI release asset download timed out'
+    )
 
     if (!response.ok) {
       throw new Error(`Failed to download CLIProxyAPI release asset: HTTP ${response.status}`)
@@ -442,7 +499,11 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
       return undefined
     }
 
-    const response = await this.fetchAdapter(checksumAsset.browser_download_url)
+    const response = await withTimeout(
+      this.fetchAdapter(checksumAsset.browser_download_url),
+      this.metadataFetchTimeoutMs,
+      'CLIProxyAPI checksum download timed out'
+    )
 
     if (!response.ok) {
       throw new Error(`Failed to download CLIProxyAPI checksums: HTTP ${response.status}`)
@@ -466,7 +527,7 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
 
       if (
         typeof parsed.version === 'string' &&
-        typeof parsed.assetName === 'string'
+        typeof parsed.executablePath === 'string'
       ) {
         return parsed as CliProxyApiInstallMetadata
       }
@@ -480,6 +541,47 @@ class DefaultCliProxyApiInstaller implements CliProxyApiInstaller {
       throw error
     }
   }
+
+  private async writeInstallMetadata(input: {
+    config: AllmoneSoftwareConfig
+    metadata: CliProxyApiReleaseMetadata
+    asset: CliProxyApiSelectedReleaseAsset
+    executablePath: string
+    checksumSha256?: string
+  }): Promise<CliProxyApiInstallMetadata> {
+    const installMetadata: CliProxyApiInstallMetadata = {
+      version: input.metadata.tag_name,
+      executablePath: input.executablePath,
+      checksumSha256: input.checksumSha256,
+      check_at: this.now().getTime()
+    }
+
+    await this.fileSystem.writeText(
+      this.runtimeHome.installMetadataPath,
+      `${JSON.stringify(installMetadata, null, 2)}\n`
+    )
+
+    return installMetadata
+  }
+
+  private async writeLocalExecutableMetadata(input: {
+    executablePath: string
+  }): Promise<CliProxyApiInstallMetadata> {
+    const executableVersion = await this.readExecutableVersion(input.executablePath)
+    const installMetadata: CliProxyApiInstallMetadata = {
+      version: executableVersion ? `v${normalizeVersion(executableVersion)}` : 'unknown',
+      executablePath: input.executablePath,
+      check_at: this.now().getTime()
+    }
+
+    await this.fileSystem.writeText(
+      this.runtimeHome.installMetadataPath,
+      `${JSON.stringify(installMetadata, null, 2)}\n`
+    )
+
+    return installMetadata
+  }
+
 }
 
 function parseReleaseMetadata(raw: string): CliProxyApiReleaseMetadata {
@@ -594,6 +696,27 @@ function sha256Hex(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex')
 }
 
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), timeoutMs)
+      })
+    ])
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout)
+    }
+  }
+}
+
 function validateManagedExecutablePath(
   executablePath: string,
   runtimeHome: RuntimeHomePaths
@@ -651,6 +774,44 @@ async function replaceFile(
 
     throw error
   }
+}
+
+async function defaultReadExecutableVersion(
+  executablePath: string
+): Promise<string | undefined> {
+  try {
+    const { stdout, stderr } = await execFileAsync(executablePath, ['--version'])
+
+    return parseExecutableVersion(`${stdout}\n${stderr}`)
+  } catch (error) {
+    const output =
+      typeof error === 'object' && error !== null
+        ? `${String((error as { stdout?: unknown }).stdout ?? '')}\n${String(
+            (error as { stderr?: unknown }).stderr ?? ''
+          )}`
+        : ''
+
+    return parseExecutableVersion(output)
+  }
+}
+
+function parseExecutableVersion(output: string): string | undefined {
+  const versionMatch =
+    output.match(/CLIProxyAPI Version:\s*v?(\d+\.\d+\.\d+)/i) ??
+    output.match(/\bv?(\d+\.\d+\.\d+)\b/)
+
+  return versionMatch?.[1] ? `v${versionMatch[1]}` : undefined
+}
+
+function isSameVersion(
+  executableVersion: string | undefined,
+  releaseTag: string
+): boolean {
+  return normalizeVersion(executableVersion) === normalizeVersion(releaseTag)
+}
+
+function normalizeVersion(version: string | undefined): string {
+  return version?.trim().replace(/^v/i, '') ?? ''
 }
 
 async function findFileByName(

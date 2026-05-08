@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import { CLI_PROXY_API_DEFAULT_MANAGEMENT_BASE_URL } from '../cliproxyapi'
@@ -9,7 +9,7 @@ import type {
   RuntimeLoadedSettings
 } from './types'
 
-const SETTINGS_FILE_NAME = 'runtime-settings.json'
+const MANAGEMENT_KEY_FILE_NAME = 'management-key.json'
 const DEFAULT_TIMEOUT_MS = 5_000
 
 export interface RuntimeAppAdapter {
@@ -26,15 +26,11 @@ interface RuntimeSettingsStoreOptions {
   app: RuntimeAppAdapter
   safeStorage: RuntimeSafeStorageAdapter
   filePath?: string
-  oldSettingsFilePath?: string
+  oldSettingsFilePaths?: string[]
   generateManagementKey?: () => string
 }
 
 interface PersistedRuntimeSettings {
-  connection?: {
-    baseUrl?: string
-    timeoutMs?: number
-  }
   managementKeyEncrypted?: string
 }
 
@@ -54,15 +50,15 @@ export function createRuntimeSettingsStore(
 
 class FileRuntimeSettingsStore implements RuntimeSettingsStore {
   private readonly filePath: string
-  private readonly oldSettingsFilePath: string | undefined
+  private readonly oldSettingsFilePaths: string[]
   private readonly safeStorage: RuntimeSafeStorageAdapter
   private readonly generateManagementKey: () => string
   private memoryManagementKey: string | undefined
 
   constructor(options: RuntimeSettingsStoreOptions) {
     this.filePath =
-      options.filePath ?? join(options.app.getPath('userData'), SETTINGS_FILE_NAME)
-    this.oldSettingsFilePath = options.oldSettingsFilePath
+      options.filePath ?? join(options.app.getPath('userData'), MANAGEMENT_KEY_FILE_NAME)
+    this.oldSettingsFilePaths = options.oldSettingsFilePaths ?? []
     this.safeStorage = options.safeStorage
     this.generateManagementKey =
       options.generateManagementKey ?? defaultGenerateManagementKey
@@ -91,14 +87,6 @@ class FileRuntimeSettingsStore implements RuntimeSettingsStore {
     const current = await this.readPersistedSettings()
     const currentLoaded = await this.load()
     const next: PersistedRuntimeSettings = {
-      connection: {
-        baseUrl: normalizeBaseUrl(
-          input.baseUrl ?? current.connection?.baseUrl
-        ),
-        timeoutMs: normalizeTimeoutMs(
-          input.timeoutMs ?? current.connection?.timeoutMs
-        )
-      },
       managementKeyEncrypted: current.managementKeyEncrypted
     }
     let managementKey = currentLoaded.managementKey
@@ -137,8 +125,8 @@ class FileRuntimeSettingsStore implements RuntimeSettingsStore {
 
     return {
       connection: {
-        baseUrl: next.connection?.baseUrl ?? normalizeBaseUrl(undefined),
-        timeoutMs: next.connection?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+        baseUrl: normalizeBaseUrl(undefined),
+        timeoutMs: DEFAULT_TIMEOUT_MS,
         managementKeyConfigured: Boolean(managementKey),
         managementKeyPersisted
       },
@@ -159,7 +147,7 @@ class FileRuntimeSettingsStore implements RuntimeSettingsStore {
   }
 
   private async readPersistedSettings(): Promise<PersistedRuntimeSettings> {
-    await this.migrateOldSettingsFile()
+    await this.deleteOldSettingsFile()
 
     try {
       const raw = await readFile(this.filePath, 'utf8')
@@ -182,26 +170,14 @@ class FileRuntimeSettingsStore implements RuntimeSettingsStore {
     await writeFile(this.filePath, `${JSON.stringify(settings, null, 2)}\n`)
   }
 
-  private async migrateOldSettingsFile(): Promise<void> {
-    const oldSettingsFilePath = this.oldSettingsFilePath
+  private async deleteOldSettingsFile(): Promise<void> {
+    for (const oldSettingsFilePath of this.oldSettingsFilePaths) {
+      if (!oldSettingsFilePath || oldSettingsFilePath === this.filePath) {
+        continue
+      }
 
-    if (!oldSettingsFilePath || oldSettingsFilePath === this.filePath) {
-      return
-    }
-
-    if (!(await fileExists(oldSettingsFilePath))) {
-      return
-    }
-
-    await mkdir(dirname(this.filePath), { recursive: true })
-
-    if (await fileExists(this.filePath)) {
       await rm(oldSettingsFilePath, { force: true })
-      return
     }
-
-    await copyFile(oldSettingsFilePath, this.filePath)
-    await rm(oldSettingsFilePath, { force: true })
   }
 
   private decryptManagementKey(encrypted: string | undefined): string | undefined {
@@ -222,8 +198,8 @@ class FileRuntimeSettingsStore implements RuntimeSettingsStore {
     managementKeyPersisted: boolean
   ): RuntimeConnectionSettings {
     return {
-      baseUrl: normalizeBaseUrl(persisted.connection?.baseUrl),
-      timeoutMs: normalizeTimeoutMs(persisted.connection?.timeoutMs),
+      baseUrl: normalizeBaseUrl(undefined),
+      timeoutMs: DEFAULT_TIMEOUT_MS,
       managementKeyConfigured: Boolean(managementKey),
       managementKeyPersisted
     }
@@ -237,14 +213,6 @@ function normalizeBaseUrl(value: string | undefined): string {
   return trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed
 }
 
-function normalizeTimeoutMs(value: number | undefined): number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    return DEFAULT_TIMEOUT_MS
-  }
-
-  return Math.round(value)
-}
-
 function defaultGenerateManagementKey(): string {
   return `allmone-mgmt-${randomBytes(32).toString('base64url')}`
 }
@@ -256,17 +224,4 @@ function isMissingFileError(error: unknown): boolean {
     'code' in error &&
     error.code === 'ENOENT'
   )
-}
-
-async function fileExists(path: string): Promise<boolean> {
-  try {
-    await readFile(path)
-    return true
-  } catch (error) {
-    if (isMissingFileError(error)) {
-      return false
-    }
-
-    throw error
-  }
 }
