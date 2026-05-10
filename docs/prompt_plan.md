@@ -1,28 +1,29 @@
 # allmone Current Prompt Plan
 
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 Specific version prompt plans live under `docs/version/<semver>/prompt_plan.md`.
 
 ## Active Version
 
-Start v0.3.0 planning setup from the root prompt:
+Continue v0.2.1 from the active version prompt plan:
 
 ```text
 Read CLAUDE.md.
 Read docs/todo.md.
 Read docs/spec.md.
 Read docs/version/README.md.
-Create docs/version/0.3.0/spec.md.
-Create docs/version/0.3.0/prompt_plan.md.
-Create docs/version/0.3.0/todo.md.
-Plan v0.3.0 Model Resource Inventory around CLIProxyAPI-backed model/resource summaries without implementing provider adapters or request routing in allmone.
-Update root docs after planning files are created.
+Read docs/version/0.2.1/spec.md.
+Read docs/version/0.2.1/prompt_plan.md.
+Read docs/version/0.2.1/todo.md.
+Start v0.2.1 Prompt 0: Persistent Local Output Key Bootstrap.
+Add allmone-owned encrypted local output key persistence and startup bootstrap. If no persistent key exists, generate one and make it available to the managed CLIProxyAPI runtime.
+Update root docs and docs/version/0.2.1/todo.md after the prompt is complete.
 ```
 
 Current next prompt:
 
-- v0.3.0 Prompt 0: Create Model Resource Inventory planning files.
+- v0.2.1 Prompt 0: Persistent Local Output Key Bootstrap.
 
 ## Operating Rule
 

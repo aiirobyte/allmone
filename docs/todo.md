@@ -1,6 +1,6 @@
 # allmone Todo
 
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 Use this file as the cross-session checklist. In a new AI window, start with:
 
@@ -10,14 +10,14 @@ Read CLAUDE.md and docs/todo.md, then continue with the active version's next un
 
 ## Active Version
 
-Active version: `0.3.0` planning setup
+Active version: `0.2.1` planned
 
 - Previous version: `docs/version/0.2.0/`
-- Active version docs: `docs/version/0.3.0/` not created yet
+- Active version docs: `docs/version/0.2.1/`
 
 ## Current Target
 
-Target: v0.3.0 Model Resource Inventory planning setup.
+Target: v0.2.1 Models module and named persistent local output keys.
 
 Definition of done:
 
@@ -66,17 +66,29 @@ Definition of done:
 - [x] Keep token contents out of renderer state, logs, and durable storage.
 - [x] Keep allmone free of API proxying, provider adapters, routing, payload rules, and request/response transformation.
 - [x] Add Settings-side CLIProxyAPI output port connectivity and model output tests.
-- [ ] Create `docs/version/0.3.0/spec.md`.
-- [ ] Create `docs/version/0.3.0/prompt_plan.md`.
-- [ ] Create `docs/version/0.3.0/todo.md`.
+- [x] Create `docs/version/0.2.1/spec.md`.
+- [x] Create `docs/version/0.2.1/prompt_plan.md`.
+- [x] Create `docs/version/0.2.1/todo.md`.
+- [ ] Add a `Models` sidebar item above `Providers`.
+- [ ] Make `Models` the default renderer section.
+- [ ] List each provider successfully configured/imported through Provider workflows.
+- [ ] Show safe basic provider information for each provider row.
+- [ ] Show model ID lists from the local CLIProxyAPI `/models` endpoint.
+- [ ] Show explicit empty model states when configured providers have no `/models` records.
+- [ ] Persist multiple named local output keys as encrypted allmone config records.
+- [ ] On every startup, ensure a persistent default local output key exists and generate one if missing.
+- [ ] Keep local output keys masked by default and reveal plaintext only after explicit user action.
+- [ ] Run `bun run test`.
+- [ ] Run `bun run typecheck`.
+- [ ] Run `bun run build`.
 
 ## Next Prompt
 
-Start v0.3.0 Prompt 0: Model Resource Inventory planning files.
+Start v0.2.1 Prompt 0: Persistent Local Output Key Bootstrap.
 
 Expected next change:
 
-- Create `docs/version/0.3.0/` planning files for model-first resource inventory around CLIProxyAPI-backed summaries.
+- Add allmone-owned encrypted local output key persistence and startup bootstrap. If no persistent key exists, generate one and make it available to the managed CLIProxyAPI runtime.
 
 ## Version Roadmap
 
@@ -88,7 +100,8 @@ Expected next change:
 - [x] v0.1.5 Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog: configure local client keys and every current CLIProxyAPI upstream family.
 - [x] v0.1.6 React Renderer And Sidebar Navigation: migrate renderer to React, add Providers/Settings sidebar, and remove duplicate OpenAI-compatible provider surface.
 - [x] v0.2.0 Auth Management Surface: multiple persisted auth files and providers through CLIProxyAPI.
-- [ ] v0.3.0 Model Resource Inventory: model-first inventory with backing provider/auth details.
+- [ ] v0.2.1 Models Module And Named Output Keys: model-first provider/model list plus persistent named local output keys.
+- [ ] v0.3.0 Model Resource Inventory: deeper model resource inventory with backing provider/auth details.
 - [ ] v0.4.0 Usage And Logs: request log, usage, queue, and error visibility.
 - [ ] v0.5.0 Local Network Sharing: safe localhost/public-interface controls through CLIProxyAPI.
 - [ ] v1.0.0 Stable Local Control Plane: packaging, docs, failure recovery, and cross-platform hardening.
@@ -126,4 +139,6 @@ Expected next change:
 - 2026-05-09: v0.2.0 Prompt 1 completed. Providers now groups multiple account auth-file summaries by provider, shows safe metadata only, reuses login/import add handoffs, deletes individual auth files through main-process IPC/CLIProxyAPI Management API, and refreshes upstream/auth summaries after add/delete.
 - 2026-05-09: v0.2.0 completed. Provider entries now render with safe metadata and delete actions, add/delete flows refresh from CLIProxyAPI-backed state, reload/startup regressions prove persisted summaries are reread, and renderer durable-storage tests prevent auth/login data from entering `localStorage` or `sessionStorage`. Verified with focused red/green tests, `bun run test`, `bun run typecheck`, and `bun run build`.
 - 2026-05-09: Added Settings output port tests after v0.2.0 completion: TCP connectivity against the final CLIProxyAPI service port plus a transient local-key `/v1/chat/completions` model output smoke test. allmone still does not proxy, adapt, or transform provider traffic.
+- 2026-05-10: v0.2.1 planning created. Models moves above Providers as the model-first default module and lists successfully configured/imported providers. User clarified local output key values are allmone-owned, stored encrypted in allmone config, masked by default, and revealable through an explicit user action.
+- 2026-05-10: User clarified model IDs must come from the local CLIProxyAPI `/models` endpoint, which requires a persistent local output key. v0.2.1 now starts with key bootstrap: on each startup, allmone checks for a persistent default key and generates one if missing.
 - Update this file and the active version todo after every meaningful coding session.

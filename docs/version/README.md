@@ -1,6 +1,6 @@
 # Version Plans
 
-Last updated: 2026-05-09
+Last updated: 2026-05-10
 
 Specific version planning lives under:
 
@@ -23,4 +23,5 @@ The root files in `docs/` are the current-session entry points. They point agent
 - `0.1.5`: Real Local Proxy Setup And Full CLIProxyAPI Upstream Catalog. Complete.
 - `0.1.6`: React Renderer And Sidebar Navigation. Complete.
 - `0.2.0`: Auth Management Surface For Multiple Persisted Auth Files And Providers. Complete.
-- `0.3.0`: Model Resource Inventory. Planned.
+- `0.2.1`: Models Module And Named Persistent Output Keys. Planned.
+- `0.3.0`: Deeper Model Resource Inventory. Planned.
