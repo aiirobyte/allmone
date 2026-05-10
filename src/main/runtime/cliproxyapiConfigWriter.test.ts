@@ -98,6 +98,53 @@ test('saving the output port updates software config and CLIProxyAPI config', as
   })
 })
 
+test('writes allmone-managed local output keys into CLIProxyAPI config', async () => {
+  await withTempRuntimeHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
+    const configStore = createAllmoneConfigStore({
+      runtimeHome,
+      safeStorage: {
+        isEncryptionAvailable: () => true,
+        encryptString: (value) => Buffer.from(`enc:${value}`, 'utf8'),
+        decryptString: (value) => value.toString('utf8').slice(4)
+      }
+    })
+    const writer = createCliProxyApiConfigWriter({
+      runtimeHome,
+      configStore
+    })
+
+    await configStore.save({
+      localOutputKeys: [
+        {
+          id: 'lok_default',
+          name: 'Default local key',
+          preview: '[REDACTED]',
+          valueEncrypted: configStore.encryptLocalOutputKeyValue('ak-local-one'),
+          isDefault: true
+        },
+        {
+          id: 'lok_secondary',
+          name: 'Secondary key',
+          preview: '[REDACTED]',
+          valueEncrypted: configStore.encryptLocalOutputKeyValue('ak-local-two'),
+          isDefault: false
+        }
+      ]
+    })
+    await writeFile(
+      runtimeHome.runtimeConfigPath,
+      `${existingCliProxyApiConfig()}api-keys:\n  - old-local-key\n`
+    )
+
+    await writer.writeManagedConfig()
+
+    const parsed = parse(await readFile(runtimeHome.runtimeConfigPath, 'utf8'))
+
+    assert.deepEqual(parsed['api-keys'], ['ak-local-one', 'ak-local-two'])
+  })
+})
+
 test('invalid output ports do not write managed config files', async () => {
   await withTempRuntimeHome(async (homeDir) => {
     const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })

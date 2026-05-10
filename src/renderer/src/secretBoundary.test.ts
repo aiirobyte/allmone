@@ -6,6 +6,7 @@ const rendererSources = [
   'appState.ts',
   'rendererTypes.ts',
   'rendererUtils.ts',
+  'pages/ModelsPage.tsx',
   'pages/ProvidersPage.tsx',
   'pages/SettingsPage.tsx'
 ]

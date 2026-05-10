@@ -42,10 +42,14 @@ class FileCliProxyApiConfigWriter implements CliProxyApiConfigWriter {
 
     const softwareConfig = config ?? await this.configStore.load()
     const current = await this.readRuntimeConfig()
+    const localOutputKeys = softwareConfig.localOutputKeys.map((key) =>
+      this.configStore.decryptLocalOutputKeyValue(key.valueEncrypted)
+    )
     const next = patchManagedRuntimeConfig(
       current,
       softwareConfig,
-      this.runtimeHome
+      this.runtimeHome,
+      localOutputKeys
     )
 
     await writeFile(
@@ -104,7 +108,8 @@ export function validateOutputPort(port: number): number {
 function patchManagedRuntimeConfig(
   current: Record<string, unknown>,
   config: AllmoneSoftwareConfig,
-  runtimeHome: RuntimeHomePaths
+  runtimeHome: RuntimeHomePaths,
+  localOutputKeys: string[]
 ): Record<string, unknown> {
   const remoteManagement = asRecord(current['remote-management'])
 
@@ -113,6 +118,7 @@ function patchManagedRuntimeConfig(
     host: config.runtime.host,
     port: config.runtime.port,
     'auth-dir': toHomePath(runtimeHome.runtimeAuthDir, runtimeHome),
+    'api-keys': localOutputKeys,
     'logging-to-file': true,
     'remote-management': {
       ...remoteManagement,

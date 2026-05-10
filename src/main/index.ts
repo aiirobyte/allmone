@@ -22,6 +22,7 @@ import { createRuntimeService } from './runtime/service'
 import { createRuntimeSettingsStore } from './runtime/settingsStore'
 import { createTrayController } from './runtime/trayController'
 import { createCliProxyApiClient } from './cli-proxy-api'
+import { createModelsService } from './models'
 import {
   createProviderLoginRunner,
   createUpstreamService
@@ -91,7 +92,8 @@ function openMainWindow(): void {
 app.whenReady().then(async () => {
   const runtimeHome = resolveRuntimeHome()
   const allmoneConfigStore = createAllmoneConfigStore({
-    runtimeHome
+    runtimeHome,
+    safeStorage
   })
   const settingsStore = createRuntimeSettingsStore({
     app,
@@ -130,6 +132,10 @@ app.whenReady().then(async () => {
   stopManagedRuntime = () => processController.shutdownAll()
 
   await allmoneConfigStore.load()
+  await createModelsService({
+    configStore: allmoneConfigStore,
+    configWriter: cliProxyApiConfigWriter
+  }).ensureDefaultLocalOutputKey()
   await runtimeService.initialize()
   const managementKey = (await settingsStore.ensureManagementKey()).managementKey
   const upstreamService = createUpstreamService({
@@ -143,6 +149,11 @@ app.whenReady().then(async () => {
     executablePath: runtimeHome.cliProxyApiExecutablePath,
     configPath: runtimeHome.runtimeConfigPath,
     runtimeDir: runtimeHome.runtimeDir
+  })
+  const modelsService = createModelsService({
+    configStore: allmoneConfigStore,
+    configWriter: cliProxyApiConfigWriter,
+    upstreamService
   })
   const trayController = createTrayController({
     createTray: () => new Tray(createTrayImage()),
@@ -173,6 +184,7 @@ app.whenReady().then(async () => {
   registerRuntimeIpcHandlers({
     ipcMain,
     runtimeService,
+    modelsService,
     upstreamService,
     providerLoginRunner,
     clipboard

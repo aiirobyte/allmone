@@ -7,9 +7,26 @@ import { parse } from 'yaml'
 import {
   CLI_PROXY_API_DEFAULT_RELEASE_METADATA_URL,
   CLI_PROXY_API_DEFAULT_RELEASE_PAGE_URL,
-  createAllmoneConfigStore
+  createAllmoneConfigStore,
+  type AllmoneConfigSafeStorageAdapter
 } from './allmoneConfigStore'
 import { ensureRuntimeHome, resolveRuntimeHome } from './runtimeHome'
+
+function createSafeStorage(): AllmoneConfigSafeStorageAdapter {
+  return {
+    isEncryptionAvailable: () => true,
+    encryptString: (value) => Buffer.from(`enc:${value}`, 'utf8'),
+    decryptString: (value) => {
+      const text = value.toString('utf8')
+
+      if (!text.startsWith('enc:')) {
+        throw new Error('bad ciphertext')
+      }
+
+      return text.slice(4)
+    }
+  }
+}
 
 async function withTempRuntimeHome<T>(
   fn: (homeDir: string) => Promise<T>
@@ -203,5 +220,50 @@ test('keeps software config secret-free when old userData runtime settings exist
       },
       managementKeyEncrypted: 'encrypted-secret'
     })
+  })
+})
+
+test('persists encrypted local output key records without plaintext values', async () => {
+  await withTempRuntimeHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
+    const store = createAllmoneConfigStore({
+      runtimeHome,
+      safeStorage: createSafeStorage()
+    })
+
+    const encrypted = store.encryptLocalOutputKeyValue('ak-allmone-secret')
+    await store.save({
+      localOutputKeys: [
+        {
+          id: 'lok_default',
+          name: 'Default local key',
+          preview: 'ak-a...[REDACTED]...cret',
+          valueEncrypted: encrypted,
+          isDefault: true
+        }
+      ]
+    })
+
+    const loaded = await store.load()
+    const raw = await readFile(runtimeHome.configPath, 'utf8')
+    const parsed = parse(raw)
+
+    assert.deepEqual(loaded.localOutputKeys, [
+      {
+        id: 'lok_default',
+        name: 'Default local key',
+        preview: 'ak-a...[REDACTED]...cret',
+        valueEncrypted: encrypted,
+        isDefault: true
+      }
+    ])
+    assert.equal(
+      store.decryptLocalOutputKeyValue(loaded.localOutputKeys[0].valueEncrypted),
+      'ak-allmone-secret'
+    )
+    assert.equal(parsed.localOutputKeys[0].id, 'lok_default')
+    assert.equal(parsed.localOutputKeys[0].isDefault, true)
+    assert(!raw.includes('ak-allmone-secret'))
+    assert(raw.includes('valueEncrypted'))
   })
 })

@@ -5,6 +5,7 @@ import {
   RUNTIME_IPC_CHANNELS,
   registerRuntimeIpcHandlers
 } from './ipc'
+import type { ModelsService } from '../models'
 import type { RuntimeService } from './service'
 import type { ProviderLoginRunner, UpstreamService } from '../upstreams'
 
@@ -263,6 +264,97 @@ function createFakeUpstreamService(): UpstreamService & { calls: string[] } {
   }
 }
 
+function createFakeModelsService(): ModelsService & {
+  calls: Array<{ name: string; payload?: unknown }>
+} {
+  return {
+    calls: [],
+    async ensureDefaultLocalOutputKey() {
+      this.calls.push({ name: 'ensure' })
+      return {
+        keys: [
+          {
+            id: 'lok_default',
+            name: 'Default local key',
+            preview: '[REDACTED]',
+            isDefault: true
+          }
+        ]
+      }
+    },
+    async getModelInventory() {
+      this.calls.push({ name: 'inventory' })
+      return {
+        serviceOrigin: 'http://127.0.0.1:8317',
+        apiBaseUrl: 'http://127.0.0.1:8317/v1',
+        fetchedAt: '2026-05-10T00:00:00.000Z',
+        localOutputKeys: [
+          {
+            id: 'lok_default',
+            name: 'Default local key',
+            preview: '[REDACTED]',
+            isDefault: true
+          }
+        ],
+        providers: []
+      }
+    },
+    async getLocalOutputKeySummaries() {
+      this.calls.push({ name: 'summaries' })
+      return [
+        {
+          id: 'lok_default',
+          name: 'Default local key',
+          preview: '[REDACTED]',
+          isDefault: true
+        }
+      ]
+    },
+    async createGeneratedLocalOutputKey(input) {
+      this.calls.push({ name: 'create', payload: input })
+      return {
+        key: {
+          id: 'lok_generated',
+          name: input.name,
+          preview: '[REDACTED]',
+          isDefault: false
+        },
+        keys: [],
+        plaintext: 'ak-generated'
+      }
+    },
+    async renameLocalOutputKey(input) {
+      this.calls.push({ name: 'rename', payload: input })
+      return {
+        key: {
+          id: input.id,
+          name: input.name,
+          preview: '[REDACTED]',
+          isDefault: false
+        },
+        keys: []
+      }
+    },
+    async revealLocalOutputKey(input) {
+      this.calls.push({ name: 'reveal', payload: input })
+      return {
+        key: {
+          id: input.id,
+          name: 'Default local key',
+          preview: '[REDACTED]',
+          isDefault: true
+        },
+        keys: [],
+        plaintext: 'ak-revealed'
+      }
+    },
+    async deleteLocalOutputKey(input) {
+      this.calls.push({ name: 'delete', payload: input })
+      return { keys: [] }
+    }
+  }
+}
+
 function createFakeLoginRunner(): ProviderLoginRunner & { calls: unknown[] } {
   return {
     calls: [],
@@ -457,7 +549,10 @@ test('validates upstream IPC payloads before calling upstream services', async (
   await ipc.invoke(RUNTIME_IPC_CHANNELS.deleteLocalApiKey, { value: 'local-secret' })
   await ipc.invoke(RUNTIME_IPC_CHANNELS.upsertApiKeyUpstream, {
     providerKind: 'gemini-api-key',
-    apiKey: 'provider-secret'
+    entryIndex: 0,
+    apiKey: 'provider-secret',
+    modelAliases: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
+    excludedModels: [{ pattern: 'gemini-1.0-pro' }]
   })
   await ipc.invoke(RUNTIME_IPC_CHANNELS.deleteApiKeyUpstream, {
     providerKind: 'gemini-api-key',
@@ -532,5 +627,52 @@ test('forwards provider login events to the invoking renderer', async () => {
         code: 'ABCD-1234'
       }
     }
+  ])
+})
+
+test('validates name-only local output key IPC payloads without echoing plaintext', async () => {
+  const ipc = createFakeIpcMain()
+  const modelsService = createFakeModelsService()
+  registerRuntimeIpcHandlers({
+    ipcMain: ipc.ipcMain,
+    runtimeService: createFakeService(),
+    modelsService
+  })
+
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.getLocalOutputKeys)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.getModelInventory)
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.createGeneratedLocalOutputKey, {
+    name: 'Generated key'
+  })
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.renameLocalOutputKey, {
+    id: 'lok_generated',
+    name: 'Renamed key'
+  })
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.revealLocalOutputKey, {
+    id: 'lok_generated'
+  })
+  await ipc.invoke(RUNTIME_IPC_CHANNELS.deleteLocalOutputKey, {
+    id: 'lok_generated'
+  })
+
+  await assert.rejects(
+    async () => {
+      await ipc.invoke(RUNTIME_IPC_CHANNELS.createGeneratedLocalOutputKey, {
+        name: ''
+      })
+    },
+    (error) =>
+      error instanceof Error &&
+      error.message === 'Invalid runtime IPC payload' &&
+      !error.message.includes('Generated key')
+  )
+
+  assert.deepEqual(modelsService.calls, [
+    { name: 'summaries' },
+    { name: 'inventory' },
+    { name: 'create', payload: { name: 'Generated key' } },
+    { name: 'rename', payload: { id: 'lok_generated', name: 'Renamed key' } },
+    { name: 'reveal', payload: { id: 'lok_generated' } },
+    { name: 'delete', payload: { id: 'lok_generated' } }
   ])
 })

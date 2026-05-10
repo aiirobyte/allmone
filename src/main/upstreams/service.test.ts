@@ -405,6 +405,16 @@ test('validates provider kind and required fields before writes', async () => {
     () => service.upsertApiKeyUpstream({ providerKind: 'api-keys', apiKey: 'x' }),
     /does not support API-key upstream writes/
   )
+  await assert.rejects(
+    () =>
+      service.upsertApiKeyUpstream({
+        providerKind: 'openai-compatibility',
+        providerName: 'MIMO',
+        baseUrl: 'api.mimo.example/v1',
+        apiKeyEntries: [{ apiKey: 'provider-secret' }]
+      }),
+    /valid OpenAI-compatible base URL/
+  )
 
   assert.deepEqual(calls, [])
 })
@@ -673,6 +683,130 @@ test('edits API-key upstream entries by index and preserves unknown fields', asy
       'base-url': 'https://claude.example.com'
     }
   ])
+})
+
+test('updates API-key provider model fields without requiring renderer API key access', async () => {
+  let writtenGemini: CliProxyApiUpstreamApiKeyEntry[] = []
+  const service = createUpstreamService({
+    client: createFakeClient({
+      async getGeminiApiKeyEntries() {
+        return {
+          entries: [
+            {
+              'api-key': 'existing-gemini-secret',
+              'base-url': 'https://gemini.example.com',
+              models: [{ name: 'old-model', alias: 'old' }],
+              'excluded-models': ['old-excluded']
+            }
+          ],
+          raw: {}
+        }
+      },
+      async putGeminiApiKeyEntries(entries) {
+        writtenGemini = entries
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      }
+    })
+  })
+
+  await service.upsertApiKeyUpstream({
+    providerKind: 'gemini-api-key',
+    entryIndex: 0,
+    modelAliases: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
+    excludedModels: [{ pattern: 'gemini-1.0-pro' }]
+  })
+
+  assert.deepEqual(writtenGemini, [
+    {
+      'api-key': 'existing-gemini-secret',
+      'base-url': 'https://gemini.example.com',
+      models: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
+      'excluded-models': ['gemini-1.0-pro']
+    }
+  ])
+})
+
+test('edits API-key provider base URL and API key while preserving other fields', async () => {
+  let writtenGemini: CliProxyApiUpstreamApiKeyEntry[] = []
+  const service = createUpstreamService({
+    client: createFakeClient({
+      async getGeminiApiKeyEntries() {
+        return {
+          entries: [
+            {
+              'api-key': 'old-gemini-secret',
+              'base-url': 'https://old-gemini.example.com',
+              models: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
+              'excluded-models': ['gemini-1.0-pro']
+            }
+          ],
+          raw: {}
+        }
+      },
+      async putGeminiApiKeyEntries(entries) {
+        writtenGemini = entries
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      }
+    })
+  })
+
+  await service.upsertApiKeyUpstream({
+    providerKind: 'gemini-api-key',
+    entryIndex: 0,
+    apiKey: 'new-gemini-secret',
+    baseUrl: 'https://new-gemini.example.com'
+  })
+
+  assert.deepEqual(writtenGemini, [
+    {
+      'api-key': 'new-gemini-secret',
+      'base-url': 'https://new-gemini.example.com',
+      models: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
+      'excluded-models': ['gemini-1.0-pro']
+    }
+  ])
+})
+
+test('edits OpenAI-compatible provider name, base URL, and API key by index', async () => {
+  const upserts: unknown[] = []
+  const service = createUpstreamService({
+    client: createFakeClient({
+      async getOpenAiCompatibilityProviders() {
+        return {
+          providers: [
+            {
+              name: 'old-openrouter',
+              'base-url': 'https://old-openrouter.example.com/v1',
+              'api-key-entries': [{ 'api-key': 'old-openrouter-secret' }],
+              models: [{ name: 'old-model', alias: 'old' }]
+            }
+          ],
+          raw: {}
+        }
+      },
+      async upsertOpenAiCompatibilityProvider(input) {
+        upserts.push(input)
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      }
+    })
+  })
+
+  await service.upsertApiKeyUpstream({
+    providerKind: 'openai-compatibility',
+    entryIndex: 0,
+    providerName: 'new-openrouter',
+    baseUrl: 'https://new-openrouter.example.com/v1',
+    apiKeyEntries: [{ apiKey: 'new-openrouter-secret' }]
+  })
+
+  assert.deepEqual(upserts[0], {
+    name: 'new-openrouter',
+    disabled: undefined,
+    'base-url': 'https://new-openrouter.example.com/v1',
+    'api-key-entries': [{ 'api-key': 'new-openrouter-secret' }],
+    headers: undefined,
+    models: undefined
+  })
 })
 
 test('generates, sets, deletes, and summarizes local client API keys safely', async () => {

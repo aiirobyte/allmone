@@ -61,6 +61,7 @@ function createHarness(options: {
       releasePageUrl: 'https://github.com/router-for-me/CLIProxyAPI/releases/latest',
       localExecutablePath: runtimeHome.cliProxyApiExecutablePath
     },
+    localOutputKeys: [],
     runtime: {
       host: '127.0.0.1',
       port: 8317,
@@ -77,6 +78,12 @@ function createHarness(options: {
     },
     async save() {
       return config
+    },
+    encryptLocalOutputKeyValue() {
+      return 'encrypted'
+    },
+    decryptLocalOutputKeyValue() {
+      return 'decrypted'
     }
   }
   const configWriter: CliProxyApiConfigWriter = {

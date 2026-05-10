@@ -21,6 +21,7 @@ export interface AllmoneSoftwareConfig {
     releasePageUrl: string
     localExecutablePath: string
   }
+  localOutputKeys: AllmoneLocalOutputKeyConfigRecord[]
   runtime: {
     host: string
     port: number
@@ -37,16 +38,34 @@ export interface AllmoneSoftwareConfigInput {
   cliproxyapi?: Partial<AllmoneSoftwareConfig['cliproxyapi']> & {
     runtime?: Partial<AllmoneSoftwareConfig['runtime']>
   }
+  localOutputKeys?: AllmoneLocalOutputKeyConfigRecord[]
   runtime?: Partial<AllmoneSoftwareConfig['runtime']>
+}
+
+export interface AllmoneLocalOutputKeyConfigRecord {
+  id: string
+  name: string
+  preview: string
+  valueEncrypted: string
+  isDefault: boolean
+}
+
+export interface AllmoneConfigSafeStorageAdapter {
+  isEncryptionAvailable(): boolean
+  encryptString(value: string): Buffer
+  decryptString(value: Buffer): string
 }
 
 export interface AllmoneConfigStoreOptions {
   runtimeHome: RuntimeHomePaths
+  safeStorage?: AllmoneConfigSafeStorageAdapter
 }
 
 export interface AllmoneConfigStore {
   load(): Promise<AllmoneSoftwareConfig>
   save(input: AllmoneSoftwareConfigInput): Promise<AllmoneSoftwareConfig>
+  encryptLocalOutputKeyValue(value: string): string
+  decryptLocalOutputKeyValue(valueEncrypted: string): string
 }
 
 export function createAllmoneConfigStore(
@@ -57,9 +76,11 @@ export function createAllmoneConfigStore(
 
 class FileAllmoneConfigStore implements AllmoneConfigStore {
   private readonly runtimeHome: RuntimeHomePaths
+  private readonly safeStorage: AllmoneConfigSafeStorageAdapter | undefined
 
   constructor(options: AllmoneConfigStoreOptions) {
     this.runtimeHome = options.runtimeHome
+    this.safeStorage = options.safeStorage
   }
 
   async load(): Promise<AllmoneSoftwareConfig> {
@@ -87,11 +108,28 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
           ...input.cliproxyapi?.runtime,
           ...input.runtime
         }
-      }
+      },
+      localOutputKeys: input.localOutputKeys ?? current.localOutputKeys
     })
 
     await this.writeConfig(config)
     return config
+  }
+
+  encryptLocalOutputKeyValue(value: string): string {
+    const trimmed = value.trim()
+
+    if (!trimmed) {
+      throw new Error('Local output key is required')
+    }
+
+    const safeStorage = this.requireSafeStorage()
+    return safeStorage.encryptString(trimmed).toString('base64')
+  }
+
+  decryptLocalOutputKeyValue(valueEncrypted: string): string {
+    const safeStorage = this.requireSafeStorage()
+    return safeStorage.decryptString(Buffer.from(valueEncrypted, 'base64'))
   }
 
   private async readConfigFile(): Promise<string | undefined> {
@@ -130,6 +168,7 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
     const host = normalizeHost(runtime.host)
     const port = normalizePort(runtime.port)
     const timeoutMs = normalizeTimeoutMs(runtime.timeoutMs)
+    const localOutputKeys = normalizeLocalOutputKeys(record.localOutputKeys)
 
     return {
       version: CONFIG_VERSION,
@@ -149,6 +188,7 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
           this.runtimeHome
         )
       },
+      localOutputKeys,
       runtime: {
         host,
         port,
@@ -169,6 +209,14 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
       this.runtimeHome.configPath,
       stringify(toConfigFile(config, this.runtimeHome), { lineWidth: 0 })
     )
+  }
+
+  private requireSafeStorage(): AllmoneConfigSafeStorageAdapter {
+    if (!this.safeStorage?.isEncryptionAvailable()) {
+      throw new Error('Encrypted local output key storage is unavailable')
+    }
+
+    return this.safeStorage
   }
 }
 
@@ -226,6 +274,70 @@ function normalizeTimeoutMs(value: unknown): number {
   }
 
   return Math.round(value)
+}
+
+function normalizeLocalOutputKeys(value: unknown): AllmoneLocalOutputKeyConfigRecord[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const seenIds = new Set<string>()
+  const records: AllmoneLocalOutputKeyConfigRecord[] = []
+
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      continue
+    }
+
+    const record = item as Record<string, unknown>
+    const id = normalizeTrimmedString(record.id)
+    const name = normalizeTrimmedString(record.name)
+    const preview = normalizeTrimmedString(record.preview)
+    const valueEncrypted = normalizeTrimmedString(record.valueEncrypted)
+
+    if (!id || !valueEncrypted || seenIds.has(id)) {
+      continue
+    }
+
+    seenIds.add(id)
+    records.push({
+      id,
+      name: name || 'Local output key',
+      preview: preview || '[REDACTED]',
+      valueEncrypted,
+      isDefault: record.default === true || record.isDefault === true
+    })
+  }
+
+  if (records.length === 0) {
+    return records
+  }
+
+  let defaultSeen = false
+  const normalized = records.map((record) => {
+    if (record.isDefault && !defaultSeen) {
+      defaultSeen = true
+      return record
+    }
+
+    return {
+      ...record,
+      isDefault: false
+    }
+  })
+
+  if (!defaultSeen) {
+    normalized[0] = {
+      ...normalized[0],
+      isDefault: true
+    }
+  }
+
+  return normalized
+}
+
+function normalizeTrimmedString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
 }
 
 function validateHttpUrl(value: unknown, field: string): string {
@@ -298,7 +410,7 @@ function toConfigFile(
   config: AllmoneSoftwareConfig,
   runtimeHome: RuntimeHomePaths
 ): AllmoneSoftwareConfigInput {
-  return {
+  const fileConfig: AllmoneSoftwareConfigInput = {
     version: config.version,
     cliproxyapi: {
       releaseMetadataUrl: config.cliproxyapi.releaseMetadataUrl,
@@ -315,6 +427,18 @@ function toConfigFile(
       }
     }
   }
+
+  if (config.localOutputKeys.length > 0) {
+    fileConfig.localOutputKeys = config.localOutputKeys.map((key) => ({
+      id: key.id,
+      name: key.name,
+      preview: key.preview,
+      valueEncrypted: key.valueEncrypted,
+      isDefault: key.isDefault
+    }))
+  }
+
+  return fileConfig
 }
 
 function toHomePath(path: string, runtimeHome: RuntimeHomePaths): string {

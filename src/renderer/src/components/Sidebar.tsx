@@ -8,6 +8,7 @@ type SidebarProps = {
 }
 
 const sections: Array<{ id: ActiveSection; label: string }> = [
+  { id: 'models', label: 'Models' },
   { id: 'providers', label: 'Providers' },
   { id: 'settings', label: 'Settings' }
 ]

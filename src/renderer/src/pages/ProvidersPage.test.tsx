@@ -14,7 +14,10 @@ function createState(patch: Partial<ViewState> = {}): ViewState {
     upstreamSummaries: [],
     authFiles: [],
     localConnection: null,
-    localKeyPlaintext: null,
+    modelInventory: null,
+    modelInventoryError: null,
+    localOutputKeys: [],
+    localOutputKeyPlaintext: null,
     outputPortTest: null,
     modelOutputTest: null,
     codexDeviceLogin: null,
@@ -39,8 +42,6 @@ test('renders Codex device login details from realtime IPC state', () => {
         loginOutput: ['Codex device code: ABCD-1234\n']
       })}
       runtimeReachable={true}
-      onGenerateLocalKey={() => {}}
-      onSetLocalKey={() => {}}
       onSaveApiKeyUpstream={() => {}}
       onSaveAmp={() => {}}
       onResetAmp={() => {}}
@@ -103,8 +104,6 @@ test('renders multiple auth files grouped under their account providers', () => 
         ]
       })}
       runtimeReachable={true}
-      onGenerateLocalKey={() => {}}
-      onSetLocalKey={() => {}}
       onSaveApiKeyUpstream={() => {}}
       onSaveAmp={() => {}}
       onResetAmp={() => {}}
@@ -141,7 +140,9 @@ test('renders multiple provider entries with delete actions without raw secrets'
             entries: [
               {
                 'api-key': 'gemini-secret-one',
-                'base-url': 'https://gemini.example.com'
+                'base-url': 'https://gemini.example.com',
+                models: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
+                'excluded-models': ['gemini-1.0-pro']
               },
               {
                 'api-key': '[REDACTED:gemi...two]',
@@ -171,8 +172,6 @@ test('renders multiple provider entries with delete actions without raw secrets'
         ]
       })}
       runtimeReachable={true}
-      onGenerateLocalKey={() => {}}
-      onSetLocalKey={() => {}}
       onSaveApiKeyUpstream={() => {}}
       onSaveAmp={() => {}}
       onResetAmp={() => {}}
@@ -185,11 +184,18 @@ test('renders multiple provider entries with delete actions without raw secrets'
   assert.match(html, /Gemini API key/)
   assert.match(html, /2 entries/)
   assert.match(html, /https:\/\/gemini\.example\.com/)
+  assert.match(html, /Edit/)
+  assert.match(html, /API Key/)
+  assert.match(html, /Leave blank to keep current key/)
+  assert.match(html, /gemini-2\.5-pro = pro/)
+  assert.match(html, /gemini-1\.0-pro/)
   assert.match(html, /OpenAI-compatible provider/)
+  assert.match(html, /Provider Name/)
   assert.match(html, /openrouter/)
   assert.match(html, /custom-openai/)
   assert.match(html, /https:\/\/custom\.example\.com\/v1/)
   assert.match(html, /disabled/)
   assert.match(html, /Delete/)
+  assert.match(html, /Save Entry/)
   assert.doesNotMatch(html, /gemini-secret-one/)
 })

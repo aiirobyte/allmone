@@ -22,8 +22,6 @@ import {
 type ProvidersPageProps = {
   state: ViewState
   runtimeReachable: boolean
-  onGenerateLocalKey: () => void
-  onSetLocalKey: () => void
   onSaveApiKeyUpstream: (input: UpstreamApiFormInput) => void
   onSaveAmp: (input: AmpFormInput) => void
   onResetAmp: () => void
@@ -38,8 +36,6 @@ type ProvidersPageProps = {
 export function ProvidersPage({
   state,
   runtimeReachable,
-  onGenerateLocalKey,
-  onSetLocalKey,
   onSaveApiKeyUpstream,
   onSaveAmp,
   onResetAmp,
@@ -73,12 +69,6 @@ export function ProvidersPage({
       ) : null}
 
       <div className="upstream-grid">
-        <LocalConnectionCard
-          state={state}
-          runtimeReachable={runtimeReachable}
-          onGenerateLocalKey={onGenerateLocalKey}
-          onSetLocalKey={onSetLocalKey}
-        />
         <ApiKeyUpstreamForm
           busyAction={state.busyAction}
           runtimeReachable={runtimeReachable}
@@ -99,6 +89,7 @@ export function ProvidersPage({
             summary={summary}
             busyAction={state.busyAction}
             runtimeReachable={runtimeReachable}
+            onSaveApiKeyUpstream={onSaveApiKeyUpstream}
             onDeleteApiKeyUpstream={onDeleteApiKeyUpstream}
           />
         ))}
@@ -142,50 +133,6 @@ function ProviderLoginPanel({ state }: { state: ViewState }): ReactElement {
       {state.loginOutput.length > 0 ? (
         <pre>{state.loginOutput.join('')}</pre>
       ) : null}
-    </div>
-  )
-}
-
-function LocalConnectionCard({
-  state,
-  runtimeReachable,
-  onGenerateLocalKey,
-  onSetLocalKey
-}: {
-  state: ViewState
-  runtimeReachable: boolean
-  onGenerateLocalKey: () => void
-  onSetLocalKey: () => void
-}): ReactElement {
-  const local = state.localConnection
-
-  return (
-    <div className="upstream-block">
-      <h3>Local Service</h3>
-      <code>{local?.serviceOrigin ?? 'Unavailable'}</code>
-      <span>{local?.localKeyConfigured ? 'Local key configured' : 'No local key'}</span>
-      {state.localKeyPlaintext ? (
-        <input readOnly value={state.localKeyPlaintext} />
-      ) : null}
-      <div className="button-row">
-        <button
-          type="button"
-          disabled={!runtimeReachable || isActionBusy(state.busyAction, 'generate-local-key')}
-          aria-busy={isActionBusy(state.busyAction, 'generate-local-key') || undefined}
-          onClick={onGenerateLocalKey}
-        >
-          Generate Key
-        </button>
-        <button
-          type="button"
-          disabled={!runtimeReachable || isActionBusy(state.busyAction, 'set-local-key')}
-          aria-busy={isActionBusy(state.busyAction, 'set-local-key') || undefined}
-          onClick={onSetLocalKey}
-        >
-          Set Key
-        </button>
-      </div>
-      <pre>{local?.snippets.openAiSdk ?? ''}</pre>
     </div>
   )
 }
@@ -312,11 +259,13 @@ function UpstreamSummary({
   summary,
   busyAction,
   runtimeReachable,
+  onSaveApiKeyUpstream,
   onDeleteApiKeyUpstream
 }: {
   summary: UpstreamProviderSummary
   busyAction: string | null
   runtimeReachable: boolean
+  onSaveApiKeyUpstream: (input: UpstreamApiFormInput) => void
   onDeleteApiKeyUpstream: (
     providerKind: UpstreamProviderKind,
     index: number
@@ -348,6 +297,7 @@ function UpstreamSummary({
               index={index}
               busyAction={busyAction}
               runtimeReachable={runtimeReachable}
+              onSaveApiKeyUpstream={onSaveApiKeyUpstream}
               onDeleteApiKeyUpstream={onDeleteApiKeyUpstream}
             />
           ))}
@@ -363,6 +313,7 @@ function ProviderEntryRow({
   index,
   busyAction,
   runtimeReachable,
+  onSaveApiKeyUpstream,
   onDeleteApiKeyUpstream
 }: {
   summary: UpstreamProviderSummary
@@ -370,6 +321,7 @@ function ProviderEntryRow({
   index: number
   busyAction: string | null
   runtimeReachable: boolean
+  onSaveApiKeyUpstream: (input: UpstreamApiFormInput) => void
   onDeleteApiKeyUpstream: (
     providerKind: UpstreamProviderKind,
     index: number
@@ -394,20 +346,133 @@ function ProviderEntryRow({
 
   return (
     <div className="provider-entry-row">
-      <div>
-        <strong>{label}</strong>
-        {metadata.length > 0 ? <span>{metadata.join(' / ')}</span> : null}
+      <div className="provider-entry-header">
+        <div>
+          <strong>{label}</strong>
+          {metadata.length > 0 ? <span>{metadata.join(' / ')}</span> : null}
+        </div>
+        <button
+          type="button"
+          className="danger"
+          disabled={!runtimeReachable || busy}
+          aria-busy={busy || undefined}
+          onClick={() => onDeleteApiKeyUpstream(summary.providerKind, index)}
+        >
+          Delete
+        </button>
       </div>
-      <button
-        type="button"
-        className="danger"
-        disabled={!runtimeReachable || busy}
-        aria-busy={busy || undefined}
-        onClick={() => onDeleteApiKeyUpstream(summary.providerKind, index)}
-      >
-        Delete
-      </button>
+      <ProviderEntryEditor
+        summary={summary}
+        record={record}
+        index={index}
+        runtimeReachable={runtimeReachable}
+        busyAction={busyAction}
+        onSaveApiKeyUpstream={onSaveApiKeyUpstream}
+      />
     </div>
+  )
+}
+
+function ProviderEntryEditor({
+  summary,
+  record,
+  index,
+  runtimeReachable,
+  busyAction,
+  onSaveApiKeyUpstream
+}: {
+  summary: UpstreamProviderSummary
+  record: Record<string, unknown>
+  index: number
+  runtimeReachable: boolean
+  busyAction: string | null
+  onSaveApiKeyUpstream: (input: UpstreamApiFormInput) => void
+}): ReactElement {
+  const busy = isActionBusy(busyAction, 'save-upstream-api')
+  const supportsExcludedModels = summary.providerKind !== 'openai-compatibility'
+  const supportsProviderName = summary.providerKind === 'openai-compatibility'
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    const apiKey = stringValue(data.get('apiKey')).trim()
+
+    onSaveApiKeyUpstream({
+      providerKind: summary.providerKind,
+      entryIndex: index,
+      providerName: supportsProviderName
+        ? stringValue(data.get('providerName')).trim()
+        : undefined,
+      baseUrl: stringValue(data.get('baseUrl')).trim() || undefined,
+      apiKey: apiKey || undefined,
+      disabled: record.disabled === true ? true : undefined,
+      modelAliases: parseModelAliases(stringValue(data.get('modelAliases'))),
+      excludedModels: supportsExcludedModels
+        ? parseExcludedModels(stringValue(data.get('excludedModels')))
+        : undefined
+    })
+  }
+
+  return (
+    <details className="provider-model-editor">
+      <summary>Edit</summary>
+      <form onSubmit={handleSubmit}>
+        {supportsProviderName ? (
+          <label>
+            <span>Provider Name</span>
+            <input
+              name="providerName"
+              defaultValue={stringField(record, 'name') ?? ''}
+              required
+            />
+          </label>
+        ) : null}
+        <label>
+          <span>Base URL</span>
+          <input
+            name="baseUrl"
+            defaultValue={stringField(record, 'baseUrl') ?? stringField(record, 'base-url') ?? ''}
+            placeholder="Optional for most providers"
+          />
+        </label>
+        <label>
+          <span>API Key</span>
+          <input
+            name="apiKey"
+            type="password"
+            autoComplete="off"
+            placeholder="Leave blank to keep current key"
+          />
+        </label>
+        <label>
+          <span>Model Aliases</span>
+          <textarea
+            name="modelAliases"
+            rows={3}
+            defaultValue={formatModelAliases(record)}
+            placeholder="upstream-model = local-alias"
+          />
+        </label>
+        {supportsExcludedModels ? (
+          <label>
+            <span>Excluded Models</span>
+            <textarea
+              name="excludedModels"
+              rows={2}
+              defaultValue={formatExcludedModels(record)}
+              placeholder="deprecated-model"
+            />
+          </label>
+        ) : null}
+        <button
+          type="submit"
+          disabled={!runtimeReachable || busy}
+          aria-busy={busy || undefined}
+        >
+          Save Entry
+        </button>
+      </form>
+    </details>
   )
 }
 
@@ -513,6 +578,61 @@ function AuthFileRow({
       ) : null}
     </div>
   )
+}
+
+function formatModelAliases(record: Record<string, unknown>): string {
+  return arrayField(record.models)
+    .map((item) => {
+      const model = isRecord(item) ? item : {}
+      const name = stringField(model, 'name')
+      const alias = stringField(model, 'alias')
+
+      if (!name) {
+        return null
+      }
+
+      return alias ? `${name} = ${alias}` : name
+    })
+    .filter((item): item is string => Boolean(item))
+    .join('\n')
+}
+
+function formatExcludedModels(record: Record<string, unknown>): string {
+  return arrayField(record['excluded-models'])
+    .filter((item): item is string => typeof item === 'string' && Boolean(item.trim()))
+    .join('\n')
+}
+
+function parseModelAliases(value: string): UpstreamApiFormInput['modelAliases'] {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const separator = line.match(/\s*(?:=>|=)\s*/)
+
+      if (!separator || separator.index === undefined) {
+        return { name: line }
+      }
+
+      const name = line.slice(0, separator.index).trim()
+      const alias = line.slice(separator.index + separator[0].length).trim()
+
+      return alias ? { name, alias } : { name }
+    })
+    .filter((row) => Boolean(row.name))
+}
+
+function parseExcludedModels(value: string): UpstreamApiFormInput['excludedModels'] {
+  return value
+    .split(/[\n,]+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((pattern) => ({ pattern }))
+}
+
+function arrayField(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

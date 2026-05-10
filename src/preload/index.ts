@@ -8,6 +8,11 @@ import type {
   RuntimeOpenAiProviderInput
 } from '../main/runtime/types'
 import type {
+  LocalOutputKeyIdInput,
+  LocalOutputKeyNamedInput,
+  LocalOutputKeyRenameInput
+} from '../main/models'
+import type {
   ProviderLoginRunInput,
   ProviderLoginEvent,
   UpstreamAmpConfig,
@@ -59,6 +64,18 @@ contextBridge.exposeInMainWorld('allmone', {
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.getUpstreamSummaries),
     getLocalConnectionOutput: () =>
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.getLocalConnectionOutput),
+    getLocalOutputKeys: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.getLocalOutputKeys),
+    getModelInventory: () =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.getModelInventory),
+    createGeneratedLocalOutputKey: (input: LocalOutputKeyNamedInput) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.createGeneratedLocalOutputKey, input),
+    renameLocalOutputKey: (input: LocalOutputKeyRenameInput) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.renameLocalOutputKey, input),
+    revealLocalOutputKey: (input: LocalOutputKeyIdInput) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.revealLocalOutputKey, input),
+    deleteLocalOutputKey: (input: LocalOutputKeyIdInput) =>
+      ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.deleteLocalOutputKey, input),
     generateLocalApiKey: () =>
       ipcRenderer.invoke(RUNTIME_IPC_CHANNELS.generateLocalApiKey),
     setLocalApiKey: (apiKey: string) =>

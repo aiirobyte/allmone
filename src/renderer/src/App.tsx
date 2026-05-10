@@ -7,12 +7,18 @@ import { createInitialViewState } from './appState'
 import { Feedback } from './components/Feedback'
 import { Sidebar } from './components/Sidebar'
 import { ManagedStatusPill } from './components/Status'
+import { ModelsPage } from './pages/ModelsPage'
 import { ProvidersPage } from './pages/ProvidersPage'
 import { SettingsPage } from './pages/SettingsPage'
 import type {
   ActiveSection,
   AmpFormInput,
   ConfigLoadResult,
+  LocalOutputKeyActionInput,
+  LocalOutputKeyActionResult,
+  LocalOutputKeyCreateInput,
+  LocalOutputKeyPlaintext,
+  LocalOutputKeyRenameFormInput,
   ModelOutputTestFormInput,
   SafeEndpointKind,
   UpstreamApiFormInput,
@@ -32,7 +38,7 @@ export type AppProps = {
 
 export function App({
   appVersion = '',
-  initialSection = 'providers'
+  initialSection = 'models'
 }: AppProps): ReactElement {
   const [activeSection, setActiveSection] =
     useState<ActiveSection>(initialSection)
@@ -65,10 +71,19 @@ export function App({
             configLoadError: config.error
           })
           Object.assign(patch, await loadUpstreams())
+          Object.assign(patch, await loadModelInventory())
         } else {
           Object.assign(patch, {
             configSummary: null,
-            configLoadError: null
+            configLoadError: null,
+            upstreamCatalog: [],
+            upstreamSummaries: [],
+            authFiles: [],
+            localConnection: null,
+            modelInventory: null,
+            modelInventoryError: null,
+            localOutputKeys: [],
+            localOutputKeyPlaintext: null
           })
         }
 
@@ -154,6 +169,31 @@ export function App({
     }
   }
 
+  async function loadModelInventory(): Promise<Partial<ViewState>> {
+    try {
+      const inventory = await window.allmone.runtime.getModelInventory()
+
+      return {
+        modelInventory: inventory,
+        localOutputKeys: inventory.localOutputKeys,
+        modelInventoryError: null
+      }
+    } catch (error) {
+      const patch: Partial<ViewState> = {
+        modelInventoryError: toMessage(error)
+      }
+
+      try {
+        patch.localOutputKeys =
+          await window.allmone.runtime.getLocalOutputKeys()
+      } catch {
+        // Keep existing key summaries when the fallback read also fails.
+      }
+
+      return patch
+    }
+  }
+
   async function refreshManagedState(): Promise<void> {
     try {
       const runtimeState = await window.allmone.runtime.getState()
@@ -164,6 +204,7 @@ export function App({
 
       if (runtimeState.status === 'reachable') {
         Object.assign(patch, await loadUpstreams())
+        Object.assign(patch, await loadModelInventory())
       }
 
       setState((current) => ({
@@ -217,17 +258,22 @@ export function App({
     void runAction('save-upstream-api', async () => {
       await window.allmone.runtime.upsertApiKeyUpstream({
         providerKind: input.providerKind,
+        entryIndex: input.entryIndex,
         apiKey: input.apiKey,
         providerName: input.providerName,
         baseUrl: input.baseUrl,
+        disabled: input.disabled,
+        modelAliases: input.modelAliases,
+        excludedModels: input.excludedModels,
         apiKeyEntries:
-          input.providerKind === 'openai-compatibility'
+          input.providerKind === 'openai-compatibility' && input.apiKey
             ? [{ apiKey: input.apiKey }]
             : undefined
       })
 
       return {
         ...(await loadUpstreams()),
+        ...(await loadModelInventory()),
         notice: 'Upstream saved'
       }
     })
@@ -249,6 +295,7 @@ export function App({
 
       return {
         ...(await loadUpstreams()),
+        ...(await loadModelInventory()),
         notice: 'Provider entry deleted'
       }
     })
@@ -260,6 +307,7 @@ export function App({
 
       return {
         ...(await loadUpstreams()),
+        ...(await loadModelInventory()),
         notice: 'Amp saved'
       }
     })
@@ -270,6 +318,8 @@ export function App({
       runtimeState: await window.allmone.runtime.saveOutputPort(port),
       configSummary: null,
       configLoadError: null,
+      modelInventory: null,
+      modelInventoryError: null,
       notice: 'Output port saved'
     }))
   }
@@ -290,6 +340,7 @@ export function App({
           configLoadError: config.error
         })
         Object.assign(patch, await loadUpstreams())
+        Object.assign(patch, await loadModelInventory())
       } else {
         Object.assign(patch, {
           configSummary: null,
@@ -298,7 +349,10 @@ export function App({
           upstreamSummaries: [],
           authFiles: [],
           localConnection: null,
-          localKeyPlaintext: null
+          modelInventory: null,
+          modelInventoryError: null,
+          localOutputKeys: [],
+          localOutputKeyPlaintext: null
         })
       }
 
@@ -366,42 +420,13 @@ export function App({
     )
   }
 
-  function generateLocalKey(): void {
-    void runAction('generate-local-key', async () => {
-      const result = await window.allmone.runtime.generateLocalApiKey()
-
-      return {
-        ...(await loadUpstreams()),
-        localKeyPlaintext: result.oneTimePlaintextKey ?? null,
-        notice: 'Local key generated'
-      }
-    })
-  }
-
-  function setLocalKey(): void {
-    const apiKey = window.prompt('Local API key')
-
-    if (!apiKey) {
-      return
-    }
-
-    void runAction('set-local-key', async () => {
-      const result = await window.allmone.runtime.setLocalApiKey(apiKey)
-
-      return {
-        ...(await loadUpstreams()),
-        localKeyPlaintext: result.oneTimePlaintextKey ?? null,
-        notice: 'Local key saved'
-      }
-    })
-  }
-
   function resetAmp(): void {
     void runAction('reset-amp', async () => {
       await window.allmone.runtime.resetAmpConfig()
 
       return {
         ...(await loadUpstreams()),
+        ...(await loadModelInventory()),
         notice: 'Amp reset'
       }
     })
@@ -421,6 +446,7 @@ export function App({
 
       return {
         ...(await loadUpstreams()),
+        ...(await loadModelInventory()),
         codexDeviceLogin: null,
         loginOutput: [],
         notice: 'Login handoff finished'
@@ -438,7 +464,73 @@ export function App({
 
       return {
         ...(await loadUpstreams()),
+        ...(await loadModelInventory()),
         notice: 'Auth file deleted'
+      }
+    })
+  }
+
+  function refreshModels(): void {
+    void runAction('refresh-models', async () => ({
+      ...(await loadModelInventory()),
+      localOutputKeyPlaintext: null,
+      notice: 'Models refreshed'
+    }))
+  }
+
+  function createGeneratedLocalOutputKey(input: LocalOutputKeyCreateInput): void {
+    void runAction('create-local-output-key', async () => {
+      const result =
+        await window.allmone.runtime.createGeneratedLocalOutputKey(input)
+
+      return {
+        ...(await loadModelInventory()),
+        localOutputKeys: result.keys,
+        localOutputKeyPlaintext: toLocalOutputKeyPlaintext(result),
+        notice: 'Local output key generated and saved'
+      }
+    })
+  }
+
+  function renameLocalOutputKey(input: LocalOutputKeyRenameFormInput): void {
+    void runAction(`rename-local-output-key:${input.id}`, async () => {
+      const result = await window.allmone.runtime.renameLocalOutputKey(input)
+
+      return {
+        ...(await loadModelInventory()),
+        localOutputKeys: result.keys,
+        localOutputKeyPlaintext: null,
+        notice: 'Local output key renamed'
+      }
+    })
+  }
+
+  function revealLocalOutputKey(input: LocalOutputKeyActionInput): void {
+    void runAction(`reveal-local-output-key:${input.id}`, async () => {
+      const result = await window.allmone.runtime.revealLocalOutputKey(input)
+
+      return {
+        ...(await loadModelInventory()),
+        localOutputKeys: result.keys,
+        localOutputKeyPlaintext: toLocalOutputKeyPlaintext(result),
+        notice: 'Local output key revealed'
+      }
+    })
+  }
+
+  function deleteLocalOutputKey(input: LocalOutputKeyActionInput): void {
+    if (!window.confirm('Delete this local output key?')) {
+      return
+    }
+
+    void runAction(`delete-local-output-key:${input.id}`, async () => {
+      const result = await window.allmone.runtime.deleteLocalOutputKey(input)
+
+      return {
+        ...(await loadModelInventory()),
+        localOutputKeys: result.keys,
+        localOutputKeyPlaintext: null,
+        notice: 'Local output key deleted'
       }
     })
   }
@@ -472,12 +564,20 @@ export function App({
 
         <Feedback error={state.error} notice={state.notice} />
 
-        {activeSection === 'providers' ? (
+        {activeSection === 'models' ? (
+          <ModelsPage
+            state={state}
+            runtimeReachable={runtimeReachable}
+            onRefresh={refreshModels}
+            onCreateGeneratedLocalOutputKey={createGeneratedLocalOutputKey}
+            onRenameLocalOutputKey={renameLocalOutputKey}
+            onRevealLocalOutputKey={revealLocalOutputKey}
+            onDeleteLocalOutputKey={deleteLocalOutputKey}
+          />
+        ) : activeSection === 'providers' ? (
           <ProvidersPage
             state={state}
             runtimeReachable={runtimeReachable}
-            onGenerateLocalKey={generateLocalKey}
-            onSetLocalKey={setLocalKey}
             onSaveApiKeyUpstream={saveApiKeyUpstream}
             onSaveAmp={saveAmp}
             onResetAmp={resetAmp}
@@ -541,4 +641,16 @@ function applyLoginEvent(state: ViewState, event: ProviderLoginEvent): ViewState
     ...state,
     loginOutput: [...state.loginOutput, event.text].slice(-20)
   }
+}
+
+function toLocalOutputKeyPlaintext(
+  result: LocalOutputKeyActionResult
+): LocalOutputKeyPlaintext | null {
+  return result.plaintext
+    ? {
+        id: result.key.id,
+        name: result.key.name,
+        value: result.plaintext
+      }
+    : null
 }

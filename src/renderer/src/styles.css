@@ -22,7 +22,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -52,7 +53,8 @@ button.danger {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-width: 0;
   min-height: 36px;
@@ -63,7 +65,12 @@ select {
   padding: 7px 10px;
 }
 
-input:focus {
+textarea {
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus {
   border-color: #2f6f73;
   outline: 2px solid #c7e6e0;
   outline-offset: 0;
@@ -232,12 +239,14 @@ h3 {
 
 .provider-surface,
 .managed-surface,
-.upstream-surface {
+.upstream-surface,
+.models-surface {
   padding: 16px;
 }
 
 .managed-surface,
-.upstream-surface {
+.upstream-surface,
+.models-surface {
   display: grid;
   gap: 12px;
   margin-bottom: 16px;
@@ -245,8 +254,110 @@ h3 {
 
 .upstream-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.models-header-row,
+.model-provider-main,
+.key-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.models-header-row span,
+.model-provider-main span,
+.key-row span,
+.empty-state span {
+  color: #667085;
+  font-size: 0.82rem;
+}
+
+.local-output-keys,
+.model-provider-list,
+.key-list {
+  display: grid;
+  gap: 10px;
+}
+
+.local-output-keys {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.key-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.key-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.key-form label,
+.one-time-key {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.key-form label span,
+.one-time-key span {
+  color: #475467;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.key-row,
+.model-provider-row,
+.empty-state {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.key-actions,
+.model-provider-details,
+.model-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.model-provider-row {
+  display: grid;
+  gap: 8px;
+}
+
+.model-provider-main strong {
+  color: #245d38;
+  font-size: 0.78rem;
+}
+
+.model-provider-details code,
+.model-chip-list code,
+.key-row span {
+  overflow-wrap: anywhere;
+}
+
+.model-chip-list span,
+.empty-state {
+  color: #667085;
+}
+
+.empty-state {
+  display: grid;
+  gap: 4px;
 }
 
 .upstream-block {
@@ -296,7 +407,7 @@ h3 {
 .account-summary-header,
 .auth-file-row,
 .provider-summary-header,
-.provider-entry-row {
+.provider-entry-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -317,7 +428,7 @@ h3 {
 }
 
 .auth-file-row div,
-.provider-entry-row div {
+.provider-entry-header div {
   display: grid;
   gap: 4px;
   min-width: 0;
@@ -334,6 +445,33 @@ h3 {
 .provider-entry-row button {
   min-width: 72px;
   padding: 0 10px;
+}
+
+.provider-entry-row {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.provider-model-editor {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.provider-model-editor summary {
+  color: #19545a;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.provider-model-editor form {
+  display: grid;
+  gap: 8px;
 }
 
 .summary-row span,

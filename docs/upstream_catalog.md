@@ -40,7 +40,7 @@ CLIProxyAPI can expose multiple client-facing output protocol surfaces over the 
 | --- | --- | --- | --- |
 | OpenAI Chat Completions | `/v1/chat/completions` | OpenAI-compatible chat clients and SDKs | Show the path from the local service origin and local key; do not transform messages or responses |
 | OpenAI Responses | `/v1/responses` | OpenAI Responses-compatible clients, including Codex-style clients | Show the path from the local service origin and local key; do not implement Responses translation |
-| Model inventory | `/models` | allmone Models module and local clients that inspect available model IDs | allmone may call the local CLIProxyAPI endpoint with an allmone-managed local output key; do not call upstream provider model endpoints |
+| Model inventory | `/v1/models` plus configured provider `models` entries | allmone Models module and local clients that inspect available model IDs | allmone may call local CLIProxyAPI model output for account/OAuth providers and may read configured API-key provider model entries from CLIProxyAPI-backed summaries; do not call upstream provider model endpoints |
 | Gemini native generate content | `/v1beta/models/...` or provider-specific Gemini route shapes | Gemini/Google GenAI-compatible clients | Expose availability as CLIProxyAPI capability; do not implement Gemini protocol handling |
 | Claude native messages | `/v1/messages` and `/v1/messages/count_tokens` where supported | Anthropic/Claude-compatible clients | Expose availability as CLIProxyAPI capability; do not implement Claude protocol handling or token counting |
 | Image generation/editing | `/v1/images/generations`, `/v1/images/edits` where enabled | OpenAI-style image clients | Reflect enabled/disabled state when CLIProxyAPI exposes it; do not implement image generation |
@@ -59,7 +59,7 @@ Notes:
 
 | Provider kind | Family | CLIProxyAPI section or channel | Management surface | allmone editable fields | Secret fields | Required redaction | UI capabilities |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `api-keys` | Local client API keys | allmone encrypted local output key config; CLIProxyAPI consumes keys for `/models` and proxy auth | allmone local key service; CLIProxyAPI runtime auth config where needed | Startup key bootstrap, generate key, set user key, set key display name, reveal key, delete key by stable ID | Local API key plaintext and encrypted-at-rest key payloads | Mask stored keys by default; persist encrypted values; return plaintext only for immediate create/set/reveal responses; generate one persistent default key when none exists | Named local key setup, startup default key, local key reveal, local key delete, local key configured state, copy explicitly revealed key |
+| `api-keys` | Local client API keys | allmone encrypted local output key config; CLIProxyAPI consumes keys for `/models` and proxy auth | allmone local key service; CLIProxyAPI runtime auth config where needed | Startup key bootstrap, generate name-only key, set key display name, reveal key, delete key by stable ID | Local API key plaintext and encrypted-at-rest key payloads | Mask stored keys by default; persist encrypted values; return plaintext only for immediate create/reveal responses; generate one persistent default key when none exists | Named local key setup, startup default key, local key reveal, local key delete, local key configured state, copy explicitly revealed key |
 | `gemini-api-key` | API-key upstream | Config section `gemini-api-key` | `/gemini-api-key` | API key, base URL, prefix, disabled state where supported, headers, proxy URL, model aliases, excluded models | API key, proxy credentials, sensitive headers | Hide API key and sensitive header/proxy values in summaries and errors | Create, edit, delete, summarize |
 | `codex-api-key` | API-key upstream | Config section `codex-api-key` | `/codex-api-key` | API key, base URL, prefix, disabled state where supported, headers, proxy URL, model aliases, excluded models | API key, proxy credentials, sensitive headers | Hide API key and sensitive header/proxy values in summaries and errors | Create, edit, delete, summarize |
 | `claude-api-key` | API-key upstream | Config section `claude-api-key` | `/claude-api-key` | API key, base URL, prefix, disabled state where supported, headers, proxy URL, model aliases, excluded models | API key, proxy credentials, sensitive headers, hidden `cloak` secrets if present, hidden `experimental-cch-signing` secrets if present | Hide API key and sensitive header/proxy values; preserve existing `cloak` and `experimental-cch-signing` fields unless explicitly replaced through supported fields | Create, edit, delete, summarize |
@@ -119,7 +119,7 @@ Recommended type boundaries:
 
 - Main process may receive plaintext submitted keys.
 - Renderer summaries must be sanitized.
-- IPC responses must not include hidden upstream secrets except explicit local output key create/set/reveal responses.
+- IPC responses must not include hidden upstream secrets except explicit local output key create/reveal responses.
 - Local output key plaintext belongs only in transient main-process handling and explicit renderer reveal responses; persisted allmone config stores encrypted key values.
 - Catalog metadata should identify secret fields so tests can assert no secret field is displayable.
 
@@ -139,7 +139,7 @@ Later prompts should add route, service, IPC, renderer, and redaction tests as t
 
 - Prefer CLIProxyAPI Management API writes.
 - Local output keys are an exception: allmone owns their durable encrypted storage because CLIProxyAPI is only the proxy/runtime consumer.
-- On startup, allmone should ensure at least one persistent local output key exists before calling local `/models`; it may generate and persist a default key when missing.
+- On startup, allmone should ensure at least one persistent local output key exists before calling local model output endpoints; it may generate and persist a default key when missing.
 - If a CLIProxyAPI endpoint is unavailable, mark that operation unsupported instead of raw-editing YAML by string replacement.
 - Preserve unknown CLIProxyAPI fields.
 - Preserve hidden `claude-api-key` fields such as `cloak` and `experimental-cch-signing` unless a supported field explicitly replaces the row.

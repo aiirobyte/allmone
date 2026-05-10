@@ -1,4 +1,5 @@
 import type { RuntimeService } from './service'
+import type { ModelsService } from '../models'
 import type {
   RuntimeConnectionSettingsInput,
   RuntimeModelOutputTestInput,
@@ -39,6 +40,12 @@ export const RUNTIME_IPC_CHANNELS = {
   generateLocalApiKey: 'runtime:upstream-generate-local-key',
   setLocalApiKey: 'runtime:upstream-set-local-key',
   deleteLocalApiKey: 'runtime:upstream-delete-local-key',
+  getLocalOutputKeys: 'models:get-local-output-keys',
+  getModelInventory: 'models:get-inventory',
+  createGeneratedLocalOutputKey: 'models:create-generated-local-output-key',
+  renameLocalOutputKey: 'models:rename-local-output-key',
+  revealLocalOutputKey: 'models:reveal-local-output-key',
+  deleteLocalOutputKey: 'models:delete-local-output-key',
   upsertApiKeyUpstream: 'runtime:upstream-upsert-api-key',
   deleteApiKeyUpstream: 'runtime:upstream-delete-api-key',
   writeAmpConfig: 'runtime:upstream-write-amp',
@@ -64,6 +71,7 @@ export interface RuntimeIpcMain {
 export interface RuntimeIpcOptions {
   ipcMain: RuntimeIpcMain
   runtimeService: RuntimeService
+  modelsService?: ModelsService
   upstreamService?: UpstreamService
   providerLoginRunner?: ProviderLoginRunner
   clipboard?: {
@@ -154,6 +162,30 @@ export function registerRuntimeIpcHandlers(options: RuntimeIpcOptions): void {
       port: software.port
     })
   })
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.getLocalOutputKeys, (_event, payload) => {
+    validateNoPayload(payload)
+    return getModelsService(options).getLocalOutputKeySummaries()
+  })
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.getModelInventory, (_event, payload) => {
+    validateNoPayload(payload)
+    return getModelsService(options).getModelInventory()
+  })
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.createGeneratedLocalOutputKey, (_event, payload) =>
+    getModelsService(options).createGeneratedLocalOutputKey(
+      validateLocalOutputKeyNamePayload(payload)
+    )
+  )
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.renameLocalOutputKey, (_event, payload) =>
+    getModelsService(options).renameLocalOutputKey(
+      validateLocalOutputKeyRenamePayload(payload)
+    )
+  )
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.revealLocalOutputKey, (_event, payload) =>
+    getModelsService(options).revealLocalOutputKey(validateLocalOutputKeyIdPayload(payload))
+  )
+  ipcMain.handle(RUNTIME_IPC_CHANNELS.deleteLocalOutputKey, (_event, payload) =>
+    getModelsService(options).deleteLocalOutputKey(validateLocalOutputKeyIdPayload(payload))
+  )
   ipcMain.handle(RUNTIME_IPC_CHANNELS.generateLocalApiKey, (_event, payload) => {
     validateNoPayload(payload)
     return getUpstreamService(options).generateLocalApiKey()
@@ -222,6 +254,14 @@ function getProviderLoginRunner(options: RuntimeIpcOptions): ProviderLoginRunner
   }
 
   return options.providerLoginRunner
+}
+
+function getModelsService(options: RuntimeIpcOptions): ModelsService {
+  if (!options.modelsService) {
+    throw new Error('Models service is unavailable')
+  }
+
+  return options.modelsService
 }
 
 function validatePortPayload(value: unknown): number {
@@ -361,6 +401,47 @@ function validateLocalKeyDeletePayload(value: unknown): { value: string } | { in
   return hasValue ? { value: value.value as string } : { index: value.index as number }
 }
 
+function validateLocalOutputKeyNamePayload(value: unknown): { name: string } {
+  assertRecord(value)
+
+  if (typeof value.name !== 'string' || !value.name.trim()) {
+    throwInvalidPayload()
+  }
+
+  return { name: value.name.trim() }
+}
+
+function validateLocalOutputKeyRenamePayload(value: unknown): {
+  id: string
+  name: string
+} {
+  assertRecord(value)
+
+  if (
+    typeof value.id !== 'string' ||
+    !value.id.trim() ||
+    typeof value.name !== 'string' ||
+    !value.name.trim()
+  ) {
+    throwInvalidPayload()
+  }
+
+  return {
+    id: value.id.trim(),
+    name: value.name.trim()
+  }
+}
+
+function validateLocalOutputKeyIdPayload(value: unknown): { id: string } {
+  assertRecord(value)
+
+  if (typeof value.id !== 'string' || !value.id.trim()) {
+    throwInvalidPayload()
+  }
+
+  return { id: value.id.trim() }
+}
+
 function validateApiKeyUpstreamPayload(value: unknown): UpstreamApiKeyCredentialInput {
   assertRecord(value)
 
@@ -376,6 +457,12 @@ function validateApiKeyUpstreamPayload(value: unknown): UpstreamApiKeyCredential
   if (value.entryIndex !== undefined && typeof value.entryIndex !== 'number') {
     throwInvalidPayload()
   }
+  if (value.modelAliases !== undefined && !isModelAliasRows(value.modelAliases)) {
+    throwInvalidPayload()
+  }
+  if (value.excludedModels !== undefined && !isExcludedModelRows(value.excludedModels)) {
+    throwInvalidPayload()
+  }
 
   return {
     providerKind: value.providerKind,
@@ -384,6 +471,12 @@ function validateApiKeyUpstreamPayload(value: unknown): UpstreamApiKeyCredential
     baseUrl: typeof value.baseUrl === 'string' ? value.baseUrl : undefined,
     providerName: typeof value.providerName === 'string' ? value.providerName : undefined,
     disabled: typeof value.disabled === 'boolean' ? value.disabled : undefined,
+    modelAliases: isModelAliasRows(value.modelAliases)
+      ? value.modelAliases
+      : undefined,
+    excludedModels: isExcludedModelRows(value.excludedModels)
+      ? value.excludedModels
+      : undefined,
     apiKeyEntries: Array.isArray(value.apiKeyEntries)
       ? value.apiKeyEntries
           .filter(isRecordValue)
@@ -494,6 +587,40 @@ function isModelRows(value: unknown): value is RuntimeOpenAiProviderInput['model
         typeof (row as Record<string, unknown>).name === 'string' &&
         ((row as Record<string, unknown>).alias === undefined ||
           typeof (row as Record<string, unknown>).alias === 'string')
+    )
+  )
+}
+
+function isModelAliasRows(
+  value: unknown
+): value is UpstreamApiKeyCredentialInput['modelAliases'] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (row) =>
+        typeof row === 'object' &&
+        row !== null &&
+        !Array.isArray(row) &&
+        typeof (row as Record<string, unknown>).name === 'string' &&
+        ((row as Record<string, unknown>).alias === undefined ||
+          typeof (row as Record<string, unknown>).alias === 'string') &&
+        ((row as Record<string, unknown>).fork === undefined ||
+          typeof (row as Record<string, unknown>).fork === 'boolean')
+    )
+  )
+}
+
+function isExcludedModelRows(
+  value: unknown
+): value is UpstreamApiKeyCredentialInput['excludedModels'] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (row) =>
+        typeof row === 'object' &&
+        row !== null &&
+        !Array.isArray(row) &&
+        typeof (row as Record<string, unknown>).pattern === 'string'
     )
   )
 }

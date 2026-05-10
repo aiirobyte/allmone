@@ -3,6 +3,14 @@ import type {
   CliProxyApiOpenAiCompatibilityDeleteInput
 } from '../../main/cli-proxy-api'
 import type {
+  LocalOutputKeyIdInput,
+  LocalOutputKeyMutationResult,
+  LocalOutputKeyNamedInput,
+  LocalOutputKeyRenameInput,
+  LocalOutputKeySummary,
+  ModelInventory
+} from '../../main/models'
+import type {
   RuntimeConfigSummary,
   RuntimeConnectionSettingsInput,
   RuntimeModelOutputTestInput,
@@ -55,6 +63,20 @@ interface AllmoneRuntimeApi {
   getUpstreamCatalog: () => Promise<UpstreamProviderCatalogEntry[]>
   getUpstreamSummaries: () => Promise<UpstreamProviderSummary[]>
   getLocalConnectionOutput: () => Promise<LocalConnectionOutput>
+  getLocalOutputKeys: () => Promise<LocalOutputKeySummary[]>
+  getModelInventory: () => Promise<ModelInventory>
+  createGeneratedLocalOutputKey: (
+    input: LocalOutputKeyNamedInput
+  ) => Promise<LocalOutputKeyMutationResult>
+  renameLocalOutputKey: (
+    input: LocalOutputKeyRenameInput
+  ) => Promise<LocalOutputKeyMutationResult>
+  revealLocalOutputKey: (
+    input: LocalOutputKeyIdInput
+  ) => Promise<LocalOutputKeyMutationResult>
+  deleteLocalOutputKey: (
+    input: LocalOutputKeyIdInput
+  ) => Promise<{ keys: LocalOutputKeySummary[] }>
   generateLocalApiKey: () => Promise<LocalApiKeyState>
   setLocalApiKey: (apiKey: string) => Promise<LocalApiKeyState>
   deleteLocalApiKey: (input: { value: string } | { index: number }) => Promise<unknown>

@@ -93,7 +93,7 @@ export interface UpstreamHeaderRow {
 
 export interface UpstreamModelAliasRow {
   name: string
-  alias: string
+  alias?: string
   fork?: boolean
 }
 

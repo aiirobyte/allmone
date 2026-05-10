@@ -6,15 +6,25 @@ import type {
   RuntimeState
 } from '../../main/runtime/types'
 import type {
+  LocalOutputKeyIdInput,
+  LocalOutputKeyMutationResult,
+  LocalOutputKeyNamedInput,
+  LocalOutputKeyRenameInput,
+  LocalOutputKeySummary,
+  ModelInventory
+} from '../../main/models'
+import type {
   LocalConnectionOutput,
   ProviderLoginEvent,
+  UpstreamExcludedModelRow,
   UpstreamAuthFileSummary,
+  UpstreamModelAliasRow,
   UpstreamProviderCatalogEntry,
   UpstreamProviderKind,
   UpstreamProviderSummary
 } from '../../main/upstreams'
 
-export type ActiveSection = 'providers' | 'settings'
+export type ActiveSection = 'models' | 'providers' | 'settings'
 
 export type ConfigLoadResult = {
   summary: RuntimeConfigSummary | null
@@ -25,9 +35,13 @@ export type SafeEndpointKind = 'api'
 
 export type UpstreamApiFormInput = {
   providerKind: UpstreamProviderKind
-  apiKey: string
+  entryIndex?: number
+  apiKey?: string
   providerName?: string
   baseUrl?: string
+  disabled?: boolean
+  modelAliases?: UpstreamModelAliasRow[]
+  excludedModels?: UpstreamExcludedModelRow[]
 }
 
 export type AmpFormInput = {
@@ -36,6 +50,17 @@ export type AmpFormInput = {
 }
 
 export type ModelOutputTestFormInput = RuntimeModelOutputTestInput
+
+export type LocalOutputKeyPlaintext = {
+  id: string
+  name: string
+  value: string
+}
+
+export type LocalOutputKeyCreateInput = LocalOutputKeyNamedInput
+export type LocalOutputKeyRenameFormInput = LocalOutputKeyRenameInput
+export type LocalOutputKeyActionInput = LocalOutputKeyIdInput
+export type LocalOutputKeyActionResult = LocalOutputKeyMutationResult
 
 export type CodexDeviceLoginState = Extract<
   ProviderLoginEvent,
@@ -51,7 +76,10 @@ export type ViewState = {
   upstreamSummaries: UpstreamProviderSummary[]
   authFiles: UpstreamAuthFileSummary[]
   localConnection: LocalConnectionOutput | null
-  localKeyPlaintext: string | null
+  modelInventory: ModelInventory | null
+  modelInventoryError: string | null
+  localOutputKeys: LocalOutputKeySummary[]
+  localOutputKeyPlaintext: LocalOutputKeyPlaintext | null
   outputPortTest: RuntimeOutputPortConnectivityResult | null
   modelOutputTest: RuntimeModelOutputTestResult | null
   codexDeviceLogin: CodexDeviceLoginState | null

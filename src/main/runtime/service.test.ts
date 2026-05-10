@@ -86,6 +86,7 @@ function managedSoftwareConfig(port = 9444): AllmoneSoftwareConfig {
       releasePageUrl: 'https://github.com/router-for-me/CLIProxyAPI/releases/latest',
       localExecutablePath: '/tmp/allmone/runtime/cli-proxy-api/bin/cli-proxy-api'
     },
+    localOutputKeys: [],
     runtime: {
       host: '127.0.0.1',
       port,
@@ -107,6 +108,12 @@ function createFakeAllmoneConfigStore(
     },
     async save() {
       return config
+    },
+    encryptLocalOutputKeyValue() {
+      return 'encrypted'
+    },
+    decryptLocalOutputKeyValue() {
+      return 'decrypted'
     }
   }
 }

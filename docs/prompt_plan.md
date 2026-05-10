@@ -6,7 +6,7 @@ Specific version prompt plans live under `docs/version/<semver>/prompt_plan.md`.
 
 ## Active Version
 
-Continue v0.2.1 from the active version prompt plan:
+Start v0.3.0 planning setup:
 
 ```text
 Read CLAUDE.md.
@@ -16,14 +16,13 @@ Read docs/version/README.md.
 Read docs/version/0.2.1/spec.md.
 Read docs/version/0.2.1/prompt_plan.md.
 Read docs/version/0.2.1/todo.md.
-Start v0.2.1 Prompt 0: Persistent Local Output Key Bootstrap.
-Add allmone-owned encrypted local output key persistence and startup bootstrap. If no persistent key exists, generate one and make it available to the managed CLIProxyAPI runtime.
-Update root docs and docs/version/0.2.1/todo.md after the prompt is complete.
+Create docs/version/0.3.0/spec.md, docs/version/0.3.0/prompt_plan.md, and docs/version/0.3.0/todo.md for Model Resource Inventory before implementation.
+Update root docs to point at docs/version/0.3.0/ after the planning files exist.
 ```
 
 Current next prompt:
 
-- v0.2.1 Prompt 0: Persistent Local Output Key Bootstrap.
+- v0.3.0 Planning Setup: create version planning files for Model Resource Inventory.
 
 ## Operating Rule
 

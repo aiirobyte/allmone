@@ -1,7 +1,7 @@
 # allmone v0.2.1 Prompt Plan
 
 Last updated: 2026-05-10
-Status: Planned
+Status: Complete
 
 ## Version Target
 
@@ -11,7 +11,7 @@ Build the `Models` module as the model-first view over already configured Provid
 
 ### Prompt 0: Persistent Local Output Key Bootstrap
 
-Status: Planned
+Status: Complete
 
 Goal: Add allmone-owned encrypted local output key persistence and startup bootstrap so `/models` can always be called with a valid key.
 
@@ -30,35 +30,37 @@ Guardrails:
 
 - Do not store local output key plaintext in allmone config; persist encrypted key values only.
 - Do not regenerate a new key on every launch when a persistent key already exists.
-- Do not send local output key plaintext to renderer except in immediate create/set/reveal responses.
+- Do not send local output key plaintext to renderer except in immediate create/reveal responses.
 - Do not use renderer `localStorage` or `sessionStorage` for local output keys or key names.
 
 ### Prompt 1: `/models` Model Inventory Contract
 
-Status: Planned
+Status: Complete
 
-Goal: Add a main-process, renderer-safe model inventory projection that calls the local CLIProxyAPI `/models` output endpoint with the default allmone-managed local output key.
+Goal: Add a main-process, renderer-safe model inventory projection that reads row-specific model data from CLIProxyAPI-owned sources with the default allmone-managed local output key where model output is needed.
 
 Expected next change:
 
 1. Add failing tests for a model inventory service that receives fake `UpstreamService` data and a fake `/models` fetch adapter.
-2. Create `src/main/models/types.ts` for provider rows, `/models` model rows, and local output key summaries.
+2. Create `src/main/models/types.ts` for provider rows with `/models` child rows and local output key summaries.
 3. Create `src/main/models/service.ts` that ensures a default key exists before fetching model IDs.
-4. Call the local CLIProxyAPI `/models` endpoint from the main process with `Authorization: Bearer <default-local-output-key>`.
-5. Normalize `/models` records into configured/imported provider rows using CLIProxyAPI-returned provider/source/channel metadata plus existing provider summaries.
-6. Preserve explicit empty model states for configured providers with no `/models` records.
-7. Add IPC/preload contract for reading model inventory.
-8. Verify with focused tests and `bun run typecheck`.
+4. Call CLIProxyAPI model output from the main process for account/OAuth Provider rows with `Authorization: Bearer <default-local-output-key>`.
+5. For API-key and OpenAI-compatible Provider rows, read that Provider entry's configured `models` list from CLIProxyAPI-backed provider summaries instead of copying merged `/v1/models` rows.
+6. Normalize each Provider row's own records into that row's `models` state directly, without gating display on provider/source/channel/owned_by metadata.
+7. Preserve explicit empty model states for Provider rows with no model child rows.
+8. Add IPC/preload contract for reading model inventory.
+9. Verify with focused tests and `bun run typecheck`.
 
 Guardrails:
 
 - Do not call upstream provider `/models` endpoints directly from allmone.
+- Do not copy merged CLIProxyAPI `/v1/models` output into API-key/OpenAI-compatible Provider rows.
 - Do not add routing, payload-rule, provider adapter, or request/response transformation logic.
 - Do not expose raw provider API keys, auth-file contents, bearer tokens, or management keys to the renderer.
 
 ### Prompt 2: Models Sidebar And List UI
 
-Status: Planned
+Status: Complete
 
 Goal: Add the renderer `Models` module above `Providers` and render the model inventory as an operational provider list.
 
@@ -81,28 +83,28 @@ Guardrails:
 
 ### Prompt 3: Named Local Output Key Management UI
 
-Status: Planned
+Status: Complete
 
 Goal: Let users manage multiple allmone-owned local output keys after the startup bootstrap exists.
 
 Expected next change:
 
-1. Add renderer and service tests for generated keys, user-provided keys, renames, explicit reveals, deletes, reloads, and secret redaction.
+1. Add renderer and service tests for generated name-only keys, renames, explicit reveals, deletes, reloads, and secret redaction.
 2. Move or replace the Providers-side local service key card with a `Models` local output key section.
-3. Render service origin, base URL, named redacted keys, default-key marker, create/set forms, rename, reveal, delete, and transient plaintext display after create/set/reveal.
-4. Refresh CLIProxyAPI runtime key config after key create/set/delete operations where needed.
+3. Render service origin, base URL, named redacted keys, default-key marker, name-only create form, rename, reveal, delete, and transient plaintext display after create/reveal.
+4. Refresh CLIProxyAPI runtime key config after key create/delete operations where needed.
 5. Verify with focused tests, `bun run test`, `bun run typecheck`, and `bun run build`.
 
 Guardrails:
 
 - Do not reveal previously stored local output key plaintext unless the user explicitly clicks to view it.
 - Do not store local output key plaintext in allmone's software config; persist encrypted key values only.
-- Do not send local output key plaintext to renderer except in immediate create/set/reveal responses.
+- Do not send local output key plaintext to renderer except in immediate create/reveal responses.
 - Do not use renderer `localStorage` or `sessionStorage` for local output keys or key names.
 
 ### Prompt 4: Refresh, Regression, And Version Handoff
 
-Status: Planned
+Status: Complete
 
 Goal: Close v0.2.1 by proving Models and named keys refresh correctly after writes and survive reload/startup.
 
@@ -111,7 +113,7 @@ Expected next change:
 1. Add integration-style regressions for startup/reload reading model inventory and named key summaries.
 2. Prove startup with no local output key creates exactly one persistent default key.
 3. Prove provider add/delete flows refresh `Models` inventory by re-calling `/models` without requiring app restart.
-4. Prove key create/set/rename/reveal/delete flows refresh the local output key section and keep plaintext transient.
+4. Prove key create/rename/reveal/delete flows refresh the local output key section and keep plaintext transient.
 5. Re-run renderer durable-storage secret-boundary tests with model/key state included.
 6. Update `docs/version/0.2.1/todo.md` as prompts complete.
 7. Update root docs and `docs/version/README.md` when v0.2.1 is complete.
@@ -125,12 +127,12 @@ Guardrails:
 
 ## Completion Checklist
 
-- [ ] Persistent local output key bootstrap.
-- [ ] `/models` model inventory contract.
-- [ ] Models sidebar and list UI.
-- [ ] Named local output key management UI.
-- [ ] Refresh/reload regressions and secret-boundary checks.
-- [ ] Root docs updated for v0.2.1 progress.
-- [ ] `bun run test`.
-- [ ] `bun run typecheck`.
-- [ ] `bun run build`.
+- [x] Persistent local output key bootstrap.
+- [x] `/models` model inventory contract.
+- [x] Models sidebar and list UI.
+- [x] Named local output key management UI.
+- [x] Refresh/reload regressions and secret-boundary checks.
+- [x] Root docs updated for v0.2.1 progress and completion.
+- [x] `bun run test`.
+- [x] `bun run typecheck`.
+- [x] `bun run build`.

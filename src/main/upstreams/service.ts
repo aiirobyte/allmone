@@ -14,6 +14,7 @@ import {
   type CliProxyApiOauthExcludedModelsMap,
   type CliProxyApiOauthModelAliasMap,
   type CliProxyApiOpenAiCompatibilityDeleteInput,
+  type CliProxyApiOpenAiCompatibilityProvider,
   type CliProxyApiOpenAiCompatibilityProviderInput,
   type CliProxyApiOpenAiCompatibilityResult,
   type CliProxyApiUpstreamApiKeyDeleteInput,
@@ -306,11 +307,11 @@ class DefaultUpstreamService implements UpstreamService {
 
       if (providerKind === 'openai-compatibility') {
         return this.client.upsertOpenAiCompatibilityProvider(
-          toOpenAiCompatibilityInput(input)
+          await this.toOpenAiCompatibilityInput(input)
         )
       }
 
-      if (!input.apiKey?.trim()) {
+      if (typeof input.entryIndex !== 'number' && !input.apiKey?.trim()) {
         throw new Error('API key is required')
       }
 
@@ -448,6 +449,23 @@ class DefaultUpstreamService implements UpstreamService {
         return this.client.getVertexApiKeyEntries()
     }
   }
+
+  private async toOpenAiCompatibilityInput(
+    input: UpstreamApiKeyCredentialInput
+  ): Promise<CliProxyApiOpenAiCompatibilityProviderInput> {
+    if (typeof input.entryIndex !== 'number') {
+      return toOpenAiCompatibilityInput(input)
+    }
+
+    const current = await this.client.getOpenAiCompatibilityProviders()
+    const existing = current.providers[input.entryIndex]
+
+    if (!existing) {
+      throw new Error('OpenAI-compatible provider entry not found')
+    }
+
+    return mergeOpenAiCompatibilityProvider(existing, input)
+  }
 }
 
 const apiKeyProviderKinds = [
@@ -510,6 +528,7 @@ function summarizeOpenAiCompatibility(
       disabled: provider.disabled,
       baseUrl: provider['base-url'],
       apiKeyEntries: (provider['api-key-entries'] ?? []).map(redactApiKeyEntry),
+      models: provider.models ?? [],
       headers: redactHeaders(provider.headers)
     }))
   }
@@ -535,11 +554,7 @@ function toApiKeyEntry(
     disabled: input.disabled,
     headers: toHeaderRecord(input.headers),
     'proxy-url': input.proxyUrl,
-    models: input.modelAliases?.map((row) => ({
-      name: row.name,
-      alias: row.alias,
-      fork: row.fork
-    })),
+    models: toCliProxyApiModelAliases(input.modelAliases),
     'excluded-models': input.excludedModels?.map((row) => row.pattern)
   })
 }
@@ -550,12 +565,23 @@ function mergeApiKeyEntries(
 ): CliProxyApiUpstreamApiKeyEntry[] {
   const newEntry = toApiKeyEntry(input)
   const entries = [...current.entries]
+
+  if (typeof input.entryIndex === 'number') {
+    if (input.entryIndex < 0 || input.entryIndex >= entries.length) {
+      throw new Error('API-key upstream entry not found')
+    }
+
+    entries[input.entryIndex] = compactObject({
+      ...entries[input.entryIndex],
+      ...newEntry
+    })
+    return entries
+  }
+
   const index =
-    typeof input.entryIndex === 'number'
-      ? input.entryIndex
-      : input.matchApiKey
-        ? entries.findIndex((entry) => entry['api-key'] === input.matchApiKey)
-        : -1
+    input.matchApiKey
+      ? entries.findIndex((entry) => entry['api-key'] === input.matchApiKey)
+      : -1
 
   if (index >= 0) {
     entries[index] = compactObject({
@@ -577,6 +603,7 @@ function toOpenAiCompatibilityInput(
   if (!input.baseUrl?.trim()) {
     throw new Error('Base URL is required')
   }
+  validateHttpUrl(input.baseUrl, 'OpenAI-compatible base URL')
   if (!input.apiKeyEntries?.some((entry) => entry.apiKey?.trim())) {
     throw new Error('At least one API key entry is required')
   }
@@ -585,18 +612,60 @@ function toOpenAiCompatibilityInput(
     name: input.providerName,
     disabled: input.disabled,
     'base-url': input.baseUrl,
-    'api-key-entries': input.apiKeyEntries.map((entry) => ({
+    'api-key-entries': toCliProxyApiKeyEntries(input.apiKeyEntries),
+    headers: toHeaderRecord(input.headers),
+    models: toCliProxyApiModelAliases(input.modelAliases)
+  }
+}
+
+function mergeOpenAiCompatibilityProvider(
+  existing: CliProxyApiOpenAiCompatibilityProvider,
+  input: UpstreamApiKeyCredentialInput
+): CliProxyApiOpenAiCompatibilityProviderInput {
+  const name = input.providerName?.trim() || existing.name?.trim()
+  const baseUrl = input.baseUrl?.trim() || existing['base-url']?.trim()
+
+  if (!name) {
+    throw new Error('Provider name is required')
+  }
+  if (!baseUrl) {
+    throw new Error('Base URL is required')
+  }
+
+  return {
+    name,
+    disabled: input.disabled ?? existing.disabled,
+    'base-url': baseUrl,
+    'api-key-entries': input.apiKeyEntries?.some((entry) => entry.apiKey?.trim())
+      ? toCliProxyApiKeyEntries(input.apiKeyEntries)
+      : existing['api-key-entries'],
+    headers: input.headers ? toHeaderRecord(input.headers) : existing.headers,
+    models: toCliProxyApiModelAliases(input.modelAliases)
+  }
+}
+
+function toCliProxyApiKeyEntries(
+  entries: UpstreamApiKeyCredentialInput['apiKeyEntries']
+): CliProxyApiOpenAiCompatibilityProviderInput['api-key-entries'] {
+  return entries?.map((entry) =>
+    compactObject({
       'api-key': entry.apiKey,
       'proxy-url': entry.proxyUrl,
       'auth-index': entry.authIndex
-    })),
-    headers: toHeaderRecord(input.headers),
-    models: input.modelAliases?.map((row) => ({
+    })
+  )
+}
+
+function toCliProxyApiModelAliases(
+  rows: UpstreamApiKeyCredentialInput['modelAliases']
+): CliProxyApiUpstreamApiKeyEntry['models'] {
+  return rows?.map((row) =>
+    compactObject({
       name: row.name,
       alias: row.alias,
       fork: row.fork
-    }))
-  }
+    })
+  )
 }
 
 function compactObject<T extends Record<string, unknown>>(value: T): T {
@@ -706,14 +775,7 @@ function toCliProxyApiAmpConfig(input: UpstreamAmpConfig): CliProxyApiAmpCodeCon
 
 function validateAmpConfig(input: UpstreamAmpConfig): void {
   if (input.upstreamUrl) {
-    try {
-      const url = new URL(input.upstreamUrl)
-      if (!['http:', 'https:'].includes(url.protocol)) {
-        throw new Error('invalid protocol')
-      }
-    } catch {
-      throw new Error('A valid Amp upstream URL is required')
-    }
+    validateHttpUrl(input.upstreamUrl, 'Amp upstream URL')
   }
 
   for (const entry of input.upstreamApiKeys ?? []) {
@@ -726,6 +788,17 @@ function validateAmpConfig(input: UpstreamAmpConfig): void {
     if (!entry.from.trim() || !entry.to.trim()) {
       throw new Error('Amp model mapping requires source and target models')
     }
+  }
+}
+
+function validateHttpUrl(value: string, label: string): void {
+  try {
+    const url = new URL(value.trim())
+    if (!['http:', 'https:'].includes(url.protocol)) {
+      throw new Error('invalid protocol')
+    }
+  } catch {
+    throw new Error(`A valid ${label} is required`)
   }
 }
 
