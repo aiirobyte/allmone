@@ -47,11 +47,11 @@ Definition of done:
 
 ## Next Prompt
 
-v0.2.1 is complete. Continue from root `docs/prompt_plan.md` to start v0.3.0 planning.
+v0.2.1 is complete. Continue from root `docs/prompt_plan.md` for the active next version.
 
 Expected next change:
 
-- Create `docs/version/0.3.0/` planning files for Model Resource Inventory before implementation.
+- v0.2.2 was inserted after v0.2.1 to correct Provider model alias sync before the broader v0.3.0 inventory work.
 
 ## Guardrails
 
@@ -75,4 +75,5 @@ Expected next change:
 - 2026-05-11: Adjusted the Models projection so a `/models` refresh sets fetched rows directly as Provider `models` state. `provider`, `source`, `channel`, and `owned_by` remain optional model metadata but do not decide whether a fetched model row is displayed. Amp integration stays out of the Models provider list because it is not a usable model provider. Verified with focused tests, `bun run test`, `bun run typecheck`, and `bun run build`.
 - 2026-05-11: Added API-key provider editing in `Providers` entry rows. The renderer sends entry index plus edited fields, API key replacement is optional, and the main process merges changes into existing CLIProxyAPI records so raw provider keys stay out of renderer state unless explicitly replaced. Verified with `bun test`, `bun run typecheck`, and `bun run build`.
 - 2026-05-11: Corrected Models refresh after local verification showed CLIProxyAPI v6.10.9 returns the same merged models response for `/api/provider/{provider}/.../models`, even for unknown providers. Account rows still read CLIProxyAPI model output, while API-key/OpenAI-compatible rows now read only their configured `models` entries from CLIProxyAPI-backed provider config, so MIMO no longer inherits Codex's merged model list.
+- 2026-05-11: After v0.2.1 completion, v0.2.2 was inserted before v0.3.0 to plan Provider model alias sync: missing aliases become identity aliases, explicit aliases remain authoritative, and `Models` displays final configured model IDs under each Provider.
 - Update this file after every meaningful coding session.
