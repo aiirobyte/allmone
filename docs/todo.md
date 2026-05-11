@@ -82,7 +82,7 @@ Definition of done:
 - [x] Keep local output keys masked by default and reveal plaintext only after explicit user action.
 - [x] Add `Providers`-side editing for existing API-key upstream entries.
 - [x] Preserve provider API-key secrets in the main process when edits leave the API key blank.
-- [x] Keep allmone free of API proxying, provider adapters, routing, payload rules, provider model endpoint calls, and request/response transformation.
+- [x] Keep allmone free of API proxying, provider adapters, routing, payload rules, non-OpenAI-compatible provider model endpoint calls, and request/response transformation.
 - [x] Run `bun run test`.
 - [x] Run `bun run typecheck`.
 - [x] Run `bun run build`.
@@ -91,6 +91,7 @@ Definition of done:
 - [x] Create `docs/version/0.2.2/todo.md`.
 - [ ] Define the effective model ID contract for Provider alias rows.
 - [ ] Add Provider alias sync that writes missing identity aliases.
+- [ ] Add OpenAI-compatible upstream `/models` fallback when CLIProxyAPI cannot provide Provider-scoped discovery.
 - [ ] Preserve explicit aliases and `fork: true` final model ID behavior.
 - [ ] Make `Models` refresh sync aliases before displaying Provider model lists.
 - [ ] Add MIMO/Codex regressions proving each Provider shows its own final alias list.
@@ -117,7 +118,7 @@ Expected next change:
 - [x] v0.1.6 React Renderer And Sidebar Navigation: migrate renderer to React, add Providers/Settings sidebar, and remove duplicate OpenAI-compatible provider surface.
 - [x] v0.2.0 Auth Management Surface: multiple persisted auth files and providers through CLIProxyAPI.
 - [x] v0.2.1 Models Module And Named Output Keys: model-first provider/model list plus persistent named local output keys.
-- [ ] v0.2.2 Provider Model Alias Sync: seed missing identity aliases per Provider and display final configured model IDs.
+- [ ] v0.2.2 Provider Model Alias Sync: seed missing identity aliases per Provider and display final exposed model IDs.
 - [ ] v0.3.0 Model Resource Inventory: deeper model resource inventory with backing provider/auth details.
 - [ ] v0.4.0 Usage And Logs: request log, usage, queue, and error visibility.
 - [ ] v0.5.0 Local Network Sharing: safe localhost/public-interface controls through CLIProxyAPI.
@@ -163,5 +164,6 @@ Expected next change:
 - 2026-05-11: Adjusted Models inventory projection so a `/models` refresh sets fetched rows directly as Provider `models` state. `provider`, `source`, `channel`, and `owned_by` remain optional model metadata but do not decide whether a fetched model row is displayed. Amp integration remains excluded from the Models provider list because it is not a usable model provider. Verified with focused tests, `bun run test`, `bun run typecheck`, and `bun run build`.
 - 2026-05-11: Added API-key provider editing in `Providers` rows. The UI writes provider name where supported, base URL, optional replacement API key, model aliases, and excluded-model patterns through CLIProxyAPI Management API routes while keeping existing raw provider API keys main-process-only. Verified with `bun test`, `bun run typecheck`, and `bun run build`.
 - 2026-05-11: Corrected Models refresh after local verification showed CLIProxyAPI v6.10.9 returns the same merged models response for `/api/provider/{provider}/.../models`, even for unknown providers. Account rows still read CLIProxyAPI model output, while API-key/OpenAI-compatible rows now read only their configured `models` entries from CLIProxyAPI-backed provider config, so MIMO no longer inherits Codex's merged model list.
-- 2026-05-11: User clarified the desired model behavior: each Provider's available models should be represented in that Provider's CLIProxyAPI alias config. Missing aliases should become identity aliases, explicit aliases should remain authoritative, and `Models` should display final configured model IDs under the Provider row. Created `docs/version/0.2.2/` planning files and deferred broader v0.3.0 inventory work.
+- 2026-05-11: User clarified the desired model behavior: each Provider's upstream models should be represented in that Provider's CLIProxyAPI alias config. Missing aliases should become identity aliases, explicit aliases should remain authoritative, and `Models` should display final exposed model IDs under the Provider row. Created `docs/version/0.2.2/` planning files and deferred broader v0.3.0 inventory work.
+- 2026-05-11: Updated v0.2.2 planning so CLIProxyAPI remains the preferred Provider-scoped discovery source, but OpenAI-compatible Providers use a main-process upstream `/models` fallback when CLIProxyAPI cannot provide reliable Provider-scoped model discovery.
 - Update this file and the active version todo after every meaningful coding session.

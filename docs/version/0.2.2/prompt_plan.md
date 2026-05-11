@@ -5,7 +5,7 @@ Status: Planned
 
 ## Version Target
 
-Implement Provider-scoped model alias sync so every configured Provider displays the final model IDs exposed by CLIProxyAPI. Missing aliases default to identity aliases, while explicit user aliases remain authoritative.
+Implement Provider-scoped model alias sync so every configured Provider displays the final model IDs exposed through CLIProxyAPI. Missing aliases default to identity aliases, while explicit user aliases remain authoritative. Prefer CLIProxyAPI Provider-scoped discovery; for OpenAI-compatible Providers only, fall back to the configured upstream `/models` endpoint when CLIProxyAPI cannot provide the upstream model list.
 
 ## Prompts
 
@@ -13,7 +13,7 @@ Implement Provider-scoped model alias sync so every configured Provider displays
 
 Status: Pending
 
-Goal: Define and test the effective model ID contract before changing refresh behavior.
+Goal: Define and test the upstream/effective model ID contract before changing refresh behavior.
 
 Expected next change:
 
@@ -21,8 +21,9 @@ Expected next change:
 2. Cover identity alias rows, explicit aliases, `fork: true`, duplicate suppression, and legacy rows with only `name`.
 3. Add tests proving `provider`, `source`, `channel`, and `owned_by` metadata never determine Provider row membership.
 4. Define the renderer-safe sync state needed for "ready", "empty", and "sync unavailable" Provider rows.
-5. Keep the contract in `src/main/models` unless an existing upstream type already owns the shape.
-6. Verify with focused tests and `bun run typecheck`.
+5. Define separate concepts for upstream model candidates, alias rows, and effective exposed model IDs.
+6. Keep the contract in `src/main/models` unless an existing upstream type already owns the shape.
+7. Verify with focused tests and `bun run typecheck`.
 
 Guardrails:
 
@@ -34,40 +35,43 @@ Guardrails:
 
 Status: Pending
 
-Goal: Add the main-process sync that writes missing identity aliases into Provider config and preserves explicit aliases.
+Goal: Add the main-process sync that discovers Provider upstream models, writes missing identity aliases into Provider config, and preserves explicit aliases.
 
 Expected next change:
 
 1. Add failing service tests for API-key upstream Provider entries.
-2. Add failing service tests for OpenAI-compatible Providers.
-3. Add account/OAuth alias map tests where the existing CLIProxyAPI Management API supports alias writes.
-4. Implement a sync path that loads current Provider config, gets Provider-scoped model candidates from CLIProxyAPI-owned data, and appends identity aliases for missing candidate names.
-5. Preserve existing alias rows, `fork`, disabled state, base URL, API key entries, headers, proxy URL, excluded models, and unknown fields.
-6. Write only changed Provider configs through existing Management API boundaries.
-7. Return a safe Provider-level sync status when Provider-scoped candidates are unavailable.
-8. Verify with focused tests and `bun run typecheck`.
+2. Add failing service tests for OpenAI-compatible Providers using CLIProxyAPI discovery when available.
+3. Add failing service tests for the OpenAI-compatible upstream `/models` fallback when CLIProxyAPI discovery is unavailable.
+4. Add account/OAuth alias map tests where the existing CLIProxyAPI Management API supports alias writes.
+5. Implement a sync path that loads current Provider config, gets Provider-scoped model candidates from CLIProxyAPI-owned data when available, and appends identity aliases for missing candidate names.
+6. For OpenAI-compatible Providers without CLIProxyAPI discovery, fetch candidate names from the configured OpenAI-compatible `/models` endpoint in the main process.
+7. Preserve existing alias rows, `fork`, disabled state, base URL, API key entries, headers, proxy URL, excluded models, and unknown fields.
+8. Write only changed Provider configs through existing Management API boundaries.
+9. Return a safe Provider-level sync status when Provider-scoped candidates are unavailable after all allowed discovery paths fail.
+10. Verify with focused tests and `bun run typecheck`.
 
 Guardrails:
 
-- Do not call upstream Provider `/models` endpoints directly from allmone.
+- Do not call upstream Provider `/models` endpoints directly from allmone except the OpenAI-compatible fallback required by v0.2.2.
 - Do not reuse merged CLIProxyAPI `/v1/models` output as Provider-scoped candidates.
 - Do not overwrite user aliases with identity aliases.
 - Do not send raw provider API keys to the renderer.
+- Do not implement non-OpenAI-compatible provider discovery fallbacks.
 
 ### Prompt 2: Models Refresh Uses Effective Alias Lists
 
 Status: Pending
 
-Goal: Make the `Models` refresh button sync aliases first, then show the final configured model IDs per Provider.
+Goal: Make the `Models` refresh button sync aliases first, then show the final exposed model IDs per Provider.
 
 Expected next change:
 
 1. Update the model inventory flow so refresh runs Provider alias sync before building Provider rows.
 2. Reload effective Provider config after any alias writes.
-3. Build `Models` rows from final alias config rather than raw model candidate rows.
+3. Build `Models` rows from CLIProxyAPI Provider-scoped effective output when available, otherwise from final alias config after sync.
 4. Keep each model list nested under its Provider row.
 5. Keep the existing refresh button and loading/error states.
-6. Add renderer tests for final alias display, identity alias display, `fork: true`, and sync-unavailable Provider rows.
+6. Add renderer tests for final alias display, identity alias display, `fork: true`, OpenAI-compatible fallback results, and sync-unavailable Provider rows.
 7. Ensure Provider edit saves still refresh the `Models` state.
 8. Verify with focused tests, `bun run test`, and `bun run typecheck`.
 
@@ -85,24 +89,26 @@ Goal: Close v0.2.2 with regression coverage, full verification, and updated plan
 
 Expected next change:
 
-1. Add regression tests for the MIMO/Codex case: each Provider shows only its own final configured alias list.
+1. Add regression tests for the MIMO/Codex case: each Provider shows only its own final exposed alias list.
 2. Add regression tests that alias sync does not leak provider API keys or local output keys.
 3. Confirm `Models` refresh does not display merged CLIProxyAPI rows for API-key/OpenAI-compatible Providers.
-4. Update `docs/version/0.2.2/todo.md` as prompts complete.
-5. Update root docs and `docs/version/README.md` when v0.2.2 is complete, then return the roadmap to v0.3.0 planning.
-6. Verify with `bun run test`, `bun run typecheck`, and `bun run build`.
+4. Add regression tests that the OpenAI-compatible fallback uses only that Provider's configured `/models` response and redacts all provider secrets from errors and renderer payloads.
+5. Update `docs/version/0.2.2/todo.md` as prompts complete.
+6. Update root docs and `docs/version/README.md` when v0.2.2 is complete, then return the roadmap to v0.3.0 planning.
+7. Verify with `bun run test`, `bun run typecheck`, and `bun run build`.
 
 Guardrails:
 
 - Keep allmone inside the desktop control plane boundary.
-- Keep CLIProxyAPI as the source of truth for proxy output, routing, alias resolution, and Provider-scoped model discovery.
+- Keep CLIProxyAPI as the source of truth for proxy output, routing, and alias resolution; use allmone's upstream `/models` fallback only for OpenAI-compatible discovery when CLIProxyAPI lacks Provider-scoped discovery.
 - Do not broaden the version into usage/log dashboards or model resource analytics.
 
 ## Completion Checklist
 
 - [ ] Effective model alias contract.
-- [ ] Provider alias sync service.
-- [ ] `Models` refresh uses final alias lists.
+- [ ] Provider upstream model discovery and alias sync service.
+- [ ] OpenAI-compatible upstream `/models` fallback.
+- [ ] `Models` refresh uses final exposed model lists.
 - [ ] MIMO/Codex and secret-boundary regressions.
 - [ ] Root docs updated for v0.2.2 completion and v0.3.0 handoff.
 - [ ] `bun run test`.
