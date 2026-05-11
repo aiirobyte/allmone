@@ -2,8 +2,14 @@ import assert from 'node:assert/strict'
 
 import {
   CliProxyApiError,
+  type CliProxyApiOpenAiCompatibilityProvider,
   type CliProxyApiUpstreamApiKeyEntry
 } from '../cli-proxy-api'
+import type {
+  AllmoneConfigStore,
+  AllmoneProviderIdConfigRecord,
+  AllmoneSoftwareConfig
+} from '../runtime/allmoneConfigStore'
 import {
   UPSTREAM_PROVIDER_KINDS,
   createUpstreamService,
@@ -115,6 +121,60 @@ function createFakeClient(
   }
 }
 
+function createFakeProviderIdConfigStore(
+  providerIds: AllmoneProviderIdConfigRecord[] = []
+): AllmoneConfigStore & { getProviderIds(): AllmoneProviderIdConfigRecord[] } {
+  let config: AllmoneSoftwareConfig = {
+    version: 1,
+    cliproxyapi: {
+      releaseMetadataUrl: 'https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest',
+      releasePageUrl: 'https://github.com/router-for-me/CLIProxyAPI/releases/latest',
+      localExecutablePath: '/tmp/allmone/runtime/cli-proxy-api/bin/cli-proxy-api'
+    },
+    providerIds,
+    localOutputKeys: [],
+    runtime: {
+      host: '127.0.0.1',
+      port: 8317,
+      timeoutMs: 5000,
+      configPath: '/tmp/allmone/runtime/cli-proxy-api/config.yaml',
+      serviceOrigin: 'http://127.0.0.1:8317',
+      apiBaseUrl: 'http://127.0.0.1:8317/v1',
+      managementBaseUrl: 'http://127.0.0.1:8317/v0/management'
+    }
+  }
+
+  return {
+    getProviderIds() {
+      return config.providerIds
+    },
+    async load() {
+      return config
+    },
+    async save(input) {
+      config = {
+        ...config,
+        providerIds: input.providerIds ?? config.providerIds,
+        localOutputKeys: input.localOutputKeys ?? config.localOutputKeys
+      }
+      return config
+    },
+    encryptLocalOutputKeyValue() {
+      return 'encrypted'
+    },
+    decryptLocalOutputKeyValue() {
+      return 'decrypted'
+    }
+  }
+}
+
+function stripAllmoneMetadata<T extends { allmone?: unknown }>(value: T): T {
+  const next = { ...value }
+
+  delete next.allmone
+  return next
+}
+
 test('returns a complete secret-safe catalog snapshot', () => {
   const service = createUpstreamService({ client: createFakeClient() })
   const catalog = service.getProviderCatalog()
@@ -194,6 +254,7 @@ test('summarizes every upstream family without leaking secrets', async () => {
         entries: [
           {
             'api-key': 'gemini-secret-key',
+            allmone: { providerId: 'gemini_work' },
             'base-url': 'https://gemini.example.com',
             'proxy-url': 'socks5://user:pass@proxy.example.com',
             headers: { Authorization: 'Bearer gemini-token', 'x-safe': 'ok' }
@@ -231,6 +292,7 @@ test('summarizes every upstream family without leaking secrets', async () => {
                 'proxy-url': 'https://u:p@proxy.example.com'
               }
             ],
+            allmone: { providerId: 'openrouter_work' },
             headers: { Authorization: 'Bearer openrouter-token' }
           }
         ],
@@ -279,6 +341,17 @@ test('summarizes every upstream family without leaking secrets', async () => {
   for (const kind of UPSTREAM_PROVIDER_KINDS) {
     assert(result.some((summary) => summary.providerKind === kind), kind)
   }
+  assert.equal(
+    (result.find((summary) => summary.providerKind === 'gemini-api-key')?.entries?.[0] as {
+      providerId?: string
+    }).providerId,
+    'gemini_work'
+  )
+  assert.equal(
+    (result.find((summary) => summary.providerKind === 'openai-compatibility')
+      ?.entries?.[0] as { providerId?: string }).providerId,
+    'openrouter_work'
+  )
 
   for (const secret of [
     'local-secret-key',
@@ -421,8 +494,12 @@ test('maps API-key upstream writes and deletes by provider kind', async () => {
     ['vertex-api-key', 'vertex-key']
   ]
 
-  for (const [providerKind, apiKey] of kinds) {
-    await service.upsertApiKeyUpstream({ providerKind, apiKey })
+  for (const [index, [providerKind, apiKey]] of kinds.entries()) {
+    await service.upsertApiKeyUpstream({
+      providerKind,
+      providerId: `provider_${index}`,
+      apiKey
+    })
   }
   await service.deleteApiKeyUpstream('gemini-api-key', { apiKey: 'gemini-key' })
 
@@ -447,7 +524,11 @@ test('validates provider kind and required fields before writes', async () => {
   })
 
   await assert.rejects(
-    () => service.upsertApiKeyUpstream({ providerKind: 'gemini-api-key' }),
+    () =>
+      service.upsertApiKeyUpstream({
+        providerKind: 'gemini-api-key',
+        providerId: 'gemini_test'
+      }),
     /API key is required/
   )
   await assert.rejects(
@@ -458,6 +539,7 @@ test('validates provider kind and required fields before writes', async () => {
     () =>
       service.upsertApiKeyUpstream({
         providerKind: 'openai-compatibility',
+        providerId: 'mimo_test',
         providerName: 'MIMO',
         baseUrl: 'api.mimo.example/v1',
         apiKeyEntries: [{ apiKey: 'provider-secret' }]
@@ -466,6 +548,141 @@ test('validates provider kind and required fields before writes', async () => {
   )
 
   assert.deepEqual(calls, [])
+})
+
+test('validates Provider ids and rejects duplicates across API-key providers', async () => {
+  const service = createUpstreamService({
+    client: createFakeClient({
+      async getGeminiApiKeyEntries() {
+        return {
+          entries: [
+            {
+              'api-key': 'gemini-secret',
+              allmone: { providerId: 'shared_id' }
+            }
+          ],
+          raw: {}
+        }
+      },
+      async getOpenAiCompatibilityProviders() {
+        return {
+          providers: [
+            {
+              name: 'openrouter',
+              'base-url': 'https://openrouter.ai/api/v1',
+              allmone: { providerId: 'openrouter_work' }
+            }
+          ],
+          raw: {}
+        }
+      }
+    })
+  })
+
+  await assert.rejects(
+    () =>
+      service.upsertApiKeyUpstream({
+        providerKind: 'codex-api-key',
+        providerId: 'shared_id',
+        apiKey: 'codex-secret'
+      }),
+    /Provider id must be unique/
+  )
+  await assert.rejects(
+    () =>
+      service.upsertApiKeyUpstream({
+        providerKind: 'openai-compatibility',
+        providerId: 'bad-id',
+        providerName: 'MIMO',
+        baseUrl: 'https://mimo.example.com/v1',
+        apiKeyEntries: [{ apiKey: 'mimo-secret' }]
+      }),
+    /Provider id/
+  )
+})
+
+test('persists Provider ids in allmone config when CLIProxyAPI drops metadata', async () => {
+  let geminiEntries: CliProxyApiUpstreamApiKeyEntry[] = [
+    { 'api-key': 'existing-gemini-secret' }
+  ]
+  let openAiProviders: CliProxyApiOpenAiCompatibilityProvider[] = [
+    {
+      name: 'openrouter',
+      'base-url': 'https://openrouter.ai/api/v1',
+      'api-key-entries': [{ 'api-key': 'openrouter-secret' }]
+    }
+  ]
+  const configStore = createFakeProviderIdConfigStore()
+  const client = createFakeClient({
+    async getGeminiApiKeyEntries() {
+      return { entries: geminiEntries, raw: {} }
+    },
+    async putGeminiApiKeyEntries(entries) {
+      geminiEntries = entries.map(stripAllmoneMetadata)
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    },
+    async getOpenAiCompatibilityProviders() {
+      return { providers: openAiProviders, raw: {} }
+    },
+    async upsertOpenAiCompatibilityProvider(input) {
+      openAiProviders = [stripAllmoneMetadata(input)]
+      return { ok: true, status: 200, raw: { status: 'ok' } }
+    }
+  })
+  const service = createUpstreamService({ client, configStore })
+
+  await service.upsertApiKeyUpstream({
+    providerKind: 'gemini-api-key',
+    entryIndex: 0,
+    providerId: 'gemini_work',
+    baseUrl: 'https://gemini.example.com'
+  })
+  await service.upsertApiKeyUpstream({
+    providerKind: 'openai-compatibility',
+    entryIndex: 0,
+    providerId: 'openrouter_work',
+    providerName: 'openrouter',
+    baseUrl: 'https://openrouter.ai/api/v1'
+  })
+
+  assert.deepEqual(configStore.getProviderIds(), [
+    { providerKind: 'gemini-api-key', entryIndex: 0, providerId: 'gemini_work' },
+    {
+      providerKind: 'openai-compatibility',
+      entryIndex: 0,
+      providerId: 'openrouter_work'
+    }
+  ])
+  assert.equal(geminiEntries[0].allmone, undefined)
+  assert.equal(openAiProviders[0].allmone, undefined)
+
+  const summaries = await service.getUpstreamSummaries()
+  const geminiSummary = summaries.find(
+    (summary) => summary.providerKind === 'gemini-api-key'
+  )
+  const openAiSummary = summaries.find(
+    (summary) => summary.providerKind === 'openai-compatibility'
+  )
+  const overlaidGeminiEntries = await service.getApiKeyUpstreamEntries?.(
+    'gemini-api-key'
+  )
+  const overlaidOpenAiProviders =
+    await service.getOpenAiCompatibilityProviderConfigs?.()
+
+  assert.equal(
+    (geminiSummary?.entries?.[0] as { providerId?: string }).providerId,
+    'gemini_work'
+  )
+  assert.equal(
+    (openAiSummary?.entries?.[0] as { providerId?: string }).providerId,
+    'openrouter_work'
+  )
+  assert.deepEqual(overlaidGeminiEntries?.[0].allmone, {
+    providerId: 'gemini_work'
+  })
+  assert.deepEqual(overlaidOpenAiProviders?.[0].allmone, {
+    providerId: 'openrouter_work'
+  })
 })
 
 test('redacts CLIProxyAPI errors before crossing the service boundary', async () => {
@@ -487,6 +704,7 @@ test('redacts CLIProxyAPI errors before crossing the service boundary', async ()
     () =>
       service.upsertApiKeyUpstream({
         providerKind: 'gemini-api-key',
+        providerId: 'gemini_test',
         apiKey: 'gemini-secret-key'
       }),
     (error) =>
@@ -533,25 +751,48 @@ test('creates API-key upstream entries by appending to each current provider lis
 
   await service.upsertApiKeyUpstream({
     providerKind: 'gemini-api-key',
+    providerId: 'gemini_new',
     apiKey: 'new-gemini',
     baseUrl: 'https://gemini.example.com',
     headers: [{ name: 'x-test', value: 'ok' }]
   })
-  await service.upsertApiKeyUpstream({ providerKind: 'codex-api-key', apiKey: 'new-codex' })
-  await service.upsertApiKeyUpstream({ providerKind: 'claude-api-key', apiKey: 'new-claude' })
-  await service.upsertApiKeyUpstream({ providerKind: 'vertex-api-key', apiKey: 'new-vertex' })
+  await service.upsertApiKeyUpstream({
+    providerKind: 'codex-api-key',
+    providerId: 'codex_new',
+    apiKey: 'new-codex'
+  })
+  await service.upsertApiKeyUpstream({
+    providerKind: 'claude-api-key',
+    providerId: 'claude_new',
+    apiKey: 'new-claude'
+  })
+  await service.upsertApiKeyUpstream({
+    providerKind: 'vertex-api-key',
+    providerId: 'vertex_new',
+    apiKey: 'new-vertex'
+  })
 
   assert.deepEqual(written.gemini, [
     { 'api-key': 'existing-gemini', custom: true },
     {
       'api-key': 'new-gemini',
+      allmone: { providerId: 'gemini_new' },
       'base-url': 'https://gemini.example.com',
       headers: { 'x-test': 'ok' }
     }
   ])
-  assert.deepEqual(written.codex?.at(-1), { 'api-key': 'new-codex' })
-  assert.deepEqual(written.claude?.at(-1), { 'api-key': 'new-claude' })
-  assert.deepEqual(written.vertex?.at(-1), { 'api-key': 'new-vertex' })
+  assert.deepEqual(written.codex?.at(-1), {
+    'api-key': 'new-codex',
+    allmone: { providerId: 'codex_new' }
+  })
+  assert.deepEqual(written.claude?.at(-1), {
+    'api-key': 'new-claude',
+    allmone: { providerId: 'claude_new' }
+  })
+  assert.deepEqual(written.vertex?.at(-1), {
+    'api-key': 'new-vertex',
+    allmone: { providerId: 'vertex_new' }
+  })
 })
 
 test('deletes provider entries by index without touching unrelated providers', async () => {
@@ -653,6 +894,7 @@ test('reloads provider and auth summaries from current persisted client state', 
   const firstService = createUpstreamService({ client })
   await firstService.upsertApiKeyUpstream({
     providerKind: 'gemini-api-key',
+    providerId: 'gemini_two',
     apiKey: 'persisted-gemini-two'
   })
   authFiles = [
@@ -719,6 +961,7 @@ test('edits API-key upstream entries by index and preserves unknown fields', asy
 
   await service.upsertApiKeyUpstream({
     providerKind: 'claude-api-key',
+    providerId: 'claude_work',
     entryIndex: 0,
     apiKey: 'new-claude',
     baseUrl: 'https://claude.example.com'
@@ -727,6 +970,7 @@ test('edits API-key upstream entries by index and preserves unknown fields', asy
   assert.deepEqual(writtenClaude, [
     {
       'api-key': 'new-claude',
+      allmone: { providerId: 'claude_work' },
       cloak: { enabled: true },
       'experimental-cch-signing': { enabled: true },
       'base-url': 'https://claude.example.com'
@@ -760,6 +1004,7 @@ test('updates API-key provider model fields without requiring renderer API key a
 
   await service.upsertApiKeyUpstream({
     providerKind: 'gemini-api-key',
+    providerId: 'gemini_work',
     entryIndex: 0,
     modelAliases: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
     excludedModels: [{ pattern: 'gemini-1.0-pro' }]
@@ -768,6 +1013,7 @@ test('updates API-key provider model fields without requiring renderer API key a
   assert.deepEqual(writtenGemini, [
     {
       'api-key': 'existing-gemini-secret',
+      allmone: { providerId: 'gemini_work' },
       'base-url': 'https://gemini.example.com',
       models: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
       'excluded-models': ['gemini-1.0-pro']
@@ -801,6 +1047,7 @@ test('edits API-key provider base URL and API key while preserving other fields'
 
   await service.upsertApiKeyUpstream({
     providerKind: 'gemini-api-key',
+    providerId: 'gemini_work',
     entryIndex: 0,
     apiKey: 'new-gemini-secret',
     baseUrl: 'https://new-gemini.example.com'
@@ -809,6 +1056,7 @@ test('edits API-key provider base URL and API key while preserving other fields'
   assert.deepEqual(writtenGemini, [
     {
       'api-key': 'new-gemini-secret',
+      allmone: { providerId: 'gemini_work' },
       'base-url': 'https://new-gemini.example.com',
       models: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
       'excluded-models': ['gemini-1.0-pro']
@@ -842,6 +1090,7 @@ test('edits OpenAI-compatible provider name, base URL, and API key by index', as
 
   await service.upsertApiKeyUpstream({
     providerKind: 'openai-compatibility',
+    providerId: 'openrouter_work',
     entryIndex: 0,
     providerName: 'new-openrouter',
     baseUrl: 'https://new-openrouter.example.com/v1',
@@ -850,11 +1099,12 @@ test('edits OpenAI-compatible provider name, base URL, and API key by index', as
 
   assert.deepEqual(upserts[0], {
     name: 'new-openrouter',
+    allmone: { providerId: 'openrouter_work' },
     disabled: undefined,
     'base-url': 'https://new-openrouter.example.com/v1',
     'api-key-entries': [{ 'api-key': 'new-openrouter-secret' }],
     headers: undefined,
-    models: undefined
+    models: [{ name: 'old-model', alias: 'old' }]
   })
 })
 

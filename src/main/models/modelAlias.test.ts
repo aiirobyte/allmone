@@ -1,9 +1,33 @@
 import assert from 'node:assert/strict'
 
 import {
+  buildGeneratedModelAlias,
+  isValidProviderId,
   projectEffectiveModelRows,
+  reconcileGeneratedModelAliases,
   reconcileModelAliases
 } from './modelAlias'
+
+test('validates Provider ids without silent rewrites', () => {
+  for (const value of ['mimo_a', 'OpenRouter_1', 'A0_']) {
+    assert.equal(isValidProviderId(value), true, value)
+  }
+
+  for (const value of ['', 'mimo-a', 'mimo a', 'mimo/a', ' mimo_a', 'mimo_a ']) {
+    assert.equal(isValidProviderId(value), false, value)
+  }
+})
+
+test('builds Provider-specific aliases while preserving raw model IDs exactly', () => {
+  assert.equal(
+    buildGeneratedModelAlias('openrouter_work', 'moonshotai/kimi-k2:free'),
+    'openrouter_work-moonshotai/kimi-k2:free'
+  )
+  assert.equal(
+    buildGeneratedModelAlias('mimo_a', 'gpt-5.5-mini'),
+    'mimo_a-gpt-5.5-mini'
+  )
+})
 
 test('projects effective model IDs from identity, explicit, fork, and legacy alias rows', () => {
   const rows = projectEffectiveModelRows([
@@ -93,4 +117,43 @@ test('does not report changes when all upstream candidates already have aliases'
 
   assert.equal(result.changed, false)
   assert.deepEqual(result.aliases, existingAliases)
+})
+
+test('reconciles generated Provider aliases with fork enabled', () => {
+  const preservedUserRow = {
+    name: 'user-only-model',
+    alias: 'user-public',
+    custom: 'preserved'
+  }
+  const result = reconcileGeneratedModelAliases({
+    providerId: 'mimo_a',
+    existingAliases: [
+      { name: 'gpt-5.5', alias: 'gpt-5.5' },
+      { name: 'moonshotai/kimi-k2:free', alias: 'old-public', custom: true },
+      preservedUserRow
+    ],
+    upstreamModelIds: [
+      'gpt-5.5',
+      'moonshotai/kimi-k2:free',
+      'claude-3.5-sonnet',
+      'claude-3.5-sonnet'
+    ]
+  })
+
+  assert.equal(result.changed, true)
+  assert.deepEqual(result.aliases, [
+    { name: 'gpt-5.5', alias: 'mimo_a-gpt-5.5', fork: true },
+    {
+      name: 'moonshotai/kimi-k2:free',
+      alias: 'mimo_a-moonshotai/kimi-k2:free',
+      custom: true,
+      fork: true
+    },
+    preservedUserRow,
+    {
+      name: 'claude-3.5-sonnet',
+      alias: 'mimo_a-claude-3.5-sonnet',
+      fork: true
+    }
+  ])
 })

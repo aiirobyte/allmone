@@ -40,11 +40,11 @@ Definition of done:
 
 ## Next Prompt
 
-v0.2.2 implementation is complete. Start v0.3.0 planning setup next.
+v0.2.2 implementation is complete. Start v0.2.3 Provider output model definition next.
 
 Expected next change:
 
-- Create `docs/version/0.3.0/` planning files for deeper model resource inventory.
+- Continue from `docs/version/0.2.3/prompt_plan.md`.
 
 ## Guardrails
 
@@ -63,4 +63,5 @@ Expected next change:
 - 2026-05-11: v0.2.2 planning files created to insert this narrower alias-sync fix before the broader v0.3.0 model resource inventory.
 - 2026-05-11: User clarified that Provider rows should start from each Provider's original upstream model list, then show the CLIProxyAPI-exposed list after alias config. CLIProxyAPI remains preferred for discovery, but OpenAI-compatible Providers must use a main-process upstream `/models` fallback when CLIProxyAPI cannot provide Provider-scoped discovery.
 - 2026-05-11: v0.2.2 completed implementation with Provider alias sync, OpenAI-compatible `/models` fallback, account/OAuth alias sync, sync-unavailable renderer state, and MIMO/Codex plus secret-boundary regressions.
+- 2026-05-11: v0.2.3 was inserted before v0.3.0 to define API-key/OpenAI-compatible Provider output aliases and leave OAuth/auth-file aliases to CLIProxyAPI built-in rules.
 - Update this file after every meaningful coding session.

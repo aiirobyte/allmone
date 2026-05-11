@@ -14,6 +14,7 @@ import {
   type CliProxyApiOpenAiCompatibilityProviderInput,
   type CliProxyApiWriteResult
 } from '../cli-proxy-api'
+import { validateProviderId } from '../models/modelAlias'
 import type {
   AllmoneConfigStore,
   AllmoneSoftwareConfig
@@ -566,6 +567,7 @@ function sanitizeConfigSummary(result: CliProxyApiConfigResult): RuntimeConfigSu
     )
       ? config['openai-compatibility'].map((provider) => ({
           name: provider.name ?? '',
+          providerId: provider.allmone?.providerId,
           disabled: provider.disabled === true,
           baseUrl: provider['base-url'] ?? '',
           apiKeyEntries: Array.isArray(provider['api-key-entries'])
@@ -618,6 +620,9 @@ function toCliProxyApiProviderInput(
     'base-url': baseUrl,
     models: sanitizeModelRows(input.models)
   }
+  if (input.providerId) {
+    provider.allmone = { providerId: validateProviderId(input.providerId) }
+  }
   const apiKey = input.apiKey?.trim()
 
   if (apiKey) {
@@ -639,20 +644,31 @@ function toCliProxyApiProviderInput(
 function sanitizeModelRows(
   models: RuntimeOpenAiProviderInput['models']
 ): RuntimeOpenAiProviderInput['models'] {
-  const rows: Array<{ name: string; alias?: string }> = (models ?? [])
-    .map((model) => ({
-      name: model.name?.trim(),
-      alias: model.alias?.trim()
-    }))
-    .filter(
-      (model): model is { name: string; alias: string | undefined } =>
-        Boolean(model.name)
+  const rows: Array<{ name: string; alias?: string; fork?: boolean }> = []
+
+  for (const model of models ?? []) {
+    const name = model.name?.trim()
+
+    if (!name) {
+      continue
+    }
+
+    rows.push(
+      compactObject({
+        name,
+        alias: model.alias?.trim() || undefined,
+        fork: model.fork === true ? true : undefined
+      })
     )
-    .map((model) =>
-      model.alias ? model : { name: model.name }
-    )
+  }
 
   return rows
+}
+
+function compactObject<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined)
+  ) as T
 }
 
 function connectToTcpOutputPort(

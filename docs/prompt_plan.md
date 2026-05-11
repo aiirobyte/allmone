@@ -6,22 +6,23 @@ Specific version prompt plans live under `docs/version/<semver>/prompt_plan.md`.
 
 ## Active Version
 
-Start v0.2.2 implementation:
+Start v0.3.0 planning setup:
 
 ```text
 Read CLAUDE.md.
 Read docs/todo.md.
 Read docs/spec.md.
 Read docs/version/README.md.
-Read docs/version/0.2.2/spec.md.
-Read docs/version/0.2.2/prompt_plan.md.
-Read docs/version/0.2.2/todo.md.
-Implement Prompt 0: Effective Model Alias Contract.
+Read docs/version/0.2.3/spec.md and todo.md for the handoff.
+Create docs/version/0.3.0/spec.md.
+Create docs/version/0.3.0/prompt_plan.md.
+Create docs/version/0.3.0/todo.md.
+Sync docs/spec.md, docs/prompt_plan.md, docs/todo.md, and docs/version/README.md.
 ```
 
 Current next prompt:
 
-- v0.2.2 Prompt 0: define and test the effective Provider model alias contract.
+- v0.3.0 Prompt 0: create the Model Resource Inventory version plan before implementation.
 
 ## Operating Rule
 

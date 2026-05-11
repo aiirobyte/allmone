@@ -139,6 +139,7 @@ app.whenReady().then(async () => {
   await runtimeService.initialize()
   const managementKey = (await settingsStore.ensureManagementKey()).managementKey
   const upstreamService = createUpstreamService({
+    configStore: allmoneConfigStore,
     client: createCliProxyApiClient({
       baseUrl: runtimeService.getState().connection.baseUrl,
       timeoutMs: runtimeService.getState().connection.timeoutMs,

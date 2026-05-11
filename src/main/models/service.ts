@@ -21,7 +21,9 @@ import type {
 } from '../upstreams'
 import {
   projectEffectiveModelRows,
+  reconcileGeneratedModelAliases,
   reconcileModelAliases,
+  validateProviderId,
   type ProviderModelAliasRow
 } from './modelAlias'
 import type {
@@ -364,13 +366,6 @@ class DefaultModelsService implements ModelsService {
         }
         continue
       }
-
-      await this.syncAccountProviderAliases({
-        summary,
-        catalog,
-        result,
-        upstreamService
-      })
     }
 
     return result
@@ -408,6 +403,7 @@ class DefaultModelsService implements ModelsService {
       const rowId = getProviderRowId(input.summary.providerKind, index)
 
       try {
+        const providerId = getProviderIdFromConfig(entry)
         const candidates = await input.upstreamService.getProviderModelCandidates({
           providerKind: input.summary.providerKind as UpstreamProviderKind,
           providerFamily: input.catalog.family,
@@ -430,7 +426,8 @@ class DefaultModelsService implements ModelsService {
           continue
         }
 
-        const reconciled = reconcileModelAliases({
+        const reconciled = reconcileGeneratedModelAliases({
+          providerId,
           existingAliases: toAliasRows(entry.models),
           upstreamModelIds: candidates
         })
@@ -500,8 +497,10 @@ class DefaultModelsService implements ModelsService {
     for (const [index, provider] of providers.entries()) {
       const rowId = getProviderRowId(input.summary.providerKind, index)
       let candidates: string[] | null = null
+      let providerId = ''
 
       try {
+        providerId = getProviderIdFromConfig(provider)
         candidates =
           (await input.upstreamService.getProviderModelCandidates?.({
             providerKind: input.summary.providerKind as UpstreamProviderKind,
@@ -524,7 +523,8 @@ class DefaultModelsService implements ModelsService {
         continue
       }
 
-      const reconciled = reconcileModelAliases({
+      const reconciled = reconcileGeneratedModelAliases({
+        providerId,
         existingAliases: toAliasRows(provider.models),
         upstreamModelIds: candidates
       })
@@ -918,6 +918,7 @@ function getProviderLabel(
 
 function getProviderDetails(entry: Record<string, unknown>): string[] {
   return [
+    getString(entry.providerId),
     getString(entry.status),
     getString(entry.source),
     getString(entry['base-url']) ?? getString(entry.baseUrl),
@@ -1048,6 +1049,11 @@ function getProviderModelHandle(target: ProviderModelFetchTarget): string {
     target.catalog.cliproxyapi.channel ??
     target.summary.providerKind
   )
+}
+
+function getProviderIdFromConfig(entry: Record<string, unknown>): string {
+  const allmone = isRecord(entry.allmone) ? entry.allmone : {}
+  return validateProviderId(allmone.providerId)
 }
 
 function buildProviderModelsUrl(apiBaseUrl: string, provider: string): string {

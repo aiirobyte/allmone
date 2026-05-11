@@ -50,6 +50,7 @@ export interface RuntimeState {
 
 export interface RuntimeOpenAiProviderSummary {
   name: string
+  providerId?: string
   disabled: boolean
   baseUrl: string
   apiKeyEntries: RuntimeProviderKeySummary[]
@@ -73,6 +74,7 @@ export interface RuntimeConfigSummary {
 
 export interface RuntimeOpenAiProviderInput {
   name: string
+  providerId?: string
   disabled?: boolean
   baseUrl: string
   apiKey?: string

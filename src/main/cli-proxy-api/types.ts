@@ -50,6 +50,11 @@ export interface CliProxyApiLatestVersionResult {
 export interface CliProxyApiModelAlias extends CliProxyApiJsonObject {
   name?: string
   alias?: string
+  fork?: boolean
+}
+
+export interface CliProxyApiAllmoneMetadata extends CliProxyApiJsonObject {
+  providerId?: string
 }
 
 export interface CliProxyApiKeyEntry extends CliProxyApiJsonObject {
@@ -68,6 +73,7 @@ export interface CliProxyApiUpstreamApiKeyEntry extends CliProxyApiJsonObject {
   'proxy-url'?: string
   models?: CliProxyApiModelAlias[]
   'excluded-models'?: string[]
+  allmone?: CliProxyApiAllmoneMetadata
 }
 
 export type CliProxyApiApiKeyPatchInput =
@@ -104,6 +110,7 @@ export interface CliProxyApiOpenAiCompatibilityProvider extends CliProxyApiJsonO
   'api-key-entries'?: CliProxyApiKeyEntry[]
   models?: CliProxyApiModelAlias[]
   headers?: Record<string, string>
+  allmone?: CliProxyApiAllmoneMetadata
 }
 
 export interface CliProxyApiOpenAiCompatibilityProviderInput
@@ -114,6 +121,7 @@ export interface CliProxyApiOpenAiCompatibilityProviderInput
   'api-key-entries'?: CliProxyApiKeyEntry[]
   models?: CliProxyApiModelAlias[]
   headers?: Record<string, string>
+  allmone?: CliProxyApiAllmoneMetadata
 }
 
 export type CliProxyApiOpenAiCompatibilityDeleteInput =

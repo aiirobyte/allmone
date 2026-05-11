@@ -25,4 +25,5 @@ The root files in `docs/` are the current-session entry points. They point agent
 - `0.2.0`: Auth Management Surface For Multiple Persisted Auth Files And Providers. Complete.
 - `0.2.1`: Models Module And Named Persistent Output Keys. Complete.
 - `0.2.2`: Provider Model Alias Sync. Complete.
+- `0.2.3`: Provider Output Model Definition. Complete.
 - `0.3.0`: Deeper Model Resource Inventory. Planned.

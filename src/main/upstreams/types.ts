@@ -23,6 +23,7 @@ export type UpstreamProviderFamily =
 
 export type UpstreamEditableFieldName =
   | 'apiKey'
+  | 'providerId'
   | 'apiKeyEntries'
   | 'baseUrl'
   | 'providerName'
@@ -111,6 +112,7 @@ export interface UpstreamApiKeyCredentialInput {
   providerKind: UpstreamProviderKind
   entryIndex?: number
   matchApiKey?: string
+  providerId?: string
   apiKey?: string
   apiKeyEntries?: UpstreamApiKeyEntryInput[]
   baseUrl?: string

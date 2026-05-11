@@ -154,6 +154,7 @@ function ApiKeyUpstreamForm({
     const data = new FormData(event.currentTarget)
     onSubmit({
       providerKind: stringValue(data.get('providerKind')) as UpstreamProviderKind,
+      providerId: stringValue(data.get('providerId')),
       apiKey: stringValue(data.get('apiKey')).trim(),
       providerName: stringValue(data.get('providerName')).trim() || undefined,
       baseUrl: stringValue(data.get('baseUrl')).trim() || undefined
@@ -173,6 +174,15 @@ function ApiKeyUpstreamForm({
             </option>
           ))}
         </select>
+      </label>
+      <label>
+        <span>Provider ID</span>
+        <input
+          name="providerId"
+          required
+          pattern="[A-Za-z0-9_]+"
+          autoComplete="off"
+        />
       </label>
       <label>
         <span>Provider Name</span>
@@ -335,6 +345,7 @@ function ProviderEntryRow({
       ? stringField(record, 'name') ?? `Provider ${index + 1}`
       : `${summary.label} ${index + 1}`
   const metadata = [
+    stringField(record, 'providerId'),
     stringField(record, 'baseUrl') ?? stringField(record, 'base-url'),
     stringField(record, 'prefix'),
     stringField(record, 'proxy-url'),
@@ -400,6 +411,7 @@ function ProviderEntryEditor({
     onSaveApiKeyUpstream({
       providerKind: summary.providerKind,
       entryIndex: index,
+      providerId: stringValue(data.get('providerId')),
       providerName: supportsProviderName
         ? stringValue(data.get('providerName')).trim()
         : undefined,
@@ -427,6 +439,16 @@ function ProviderEntryEditor({
             />
           </label>
         ) : null}
+        <label>
+          <span>Provider ID</span>
+          <input
+            name="providerId"
+            defaultValue={stringField(record, 'providerId') ?? ''}
+            required
+            pattern="[A-Za-z0-9_]+"
+            autoComplete="off"
+          />
+        </label>
         <label>
           <span>Base URL</span>
           <input

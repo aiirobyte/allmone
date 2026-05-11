@@ -1,5 +1,6 @@
 import type { RuntimeService } from './service'
 import type { ModelsService } from '../models'
+import { isValidProviderId } from '../models/modelAlias'
 import type {
   RuntimeConnectionSettingsInput,
   RuntimeModelOutputTestInput,
@@ -342,6 +343,11 @@ function validateProviderPayload(value: unknown): RuntimeOpenAiProviderInput {
   assertOptionalBoolean(value.disabled)
   assertOptionalString(value.apiKey)
   assertOptionalString(value.proxyUrl)
+  assertOptionalString(value.providerId)
+
+  if (value.providerId !== undefined && !isValidProviderId(value.providerId)) {
+    throwInvalidPayload()
+  }
 
   if (value.models !== undefined && !isModelRows(value.models)) {
     throwInvalidPayload()
@@ -356,6 +362,8 @@ function validateProviderPayload(value: unknown): RuntimeOpenAiProviderInput {
     disabled:
       typeof value.disabled === 'boolean' ? value.disabled : undefined,
     baseUrl: value.baseUrl,
+    providerId:
+      typeof value.providerId === 'string' ? value.providerId : undefined,
     apiKey: typeof value.apiKey === 'string' ? value.apiKey : undefined,
     proxyUrl: typeof value.proxyUrl === 'string' ? value.proxyUrl : undefined,
     models: isModelRows(value.models) ? value.models : undefined,
@@ -450,9 +458,18 @@ function validateApiKeyUpstreamPayload(value: unknown): UpstreamApiKeyCredential
   }
 
   assertOptionalString(value.apiKey)
+  assertOptionalString(value.providerId)
   assertOptionalString(value.baseUrl)
   assertOptionalString(value.providerName)
   assertOptionalBoolean(value.disabled)
+
+  if (isApiKeyProviderKind(value.providerKind)) {
+    if (typeof value.providerId !== 'string' || !isValidProviderId(value.providerId)) {
+      throwInvalidPayload()
+    }
+  } else if (value.providerId !== undefined) {
+    throwInvalidPayload()
+  }
 
   if (value.entryIndex !== undefined && typeof value.entryIndex !== 'number') {
     throwInvalidPayload()
@@ -467,6 +484,7 @@ function validateApiKeyUpstreamPayload(value: unknown): UpstreamApiKeyCredential
   return {
     providerKind: value.providerKind,
     entryIndex: typeof value.entryIndex === 'number' ? value.entryIndex : undefined,
+    providerId: typeof value.providerId === 'string' ? value.providerId : undefined,
     apiKey: typeof value.apiKey === 'string' ? value.apiKey : undefined,
     baseUrl: typeof value.baseUrl === 'string' ? value.baseUrl : undefined,
     providerName: typeof value.providerName === 'string' ? value.providerName : undefined,
@@ -656,6 +674,19 @@ function isProviderKind(value: unknown): value is UpstreamProviderKind {
       'codex',
       'kimi',
       'vertex'
+    ].includes(value)
+  )
+}
+
+function isApiKeyProviderKind(value: unknown): boolean {
+  return (
+    typeof value === 'string' &&
+    [
+      'gemini-api-key',
+      'codex-api-key',
+      'claude-api-key',
+      'openai-compatibility',
+      'vertex-api-key'
     ].includes(value)
   )
 }

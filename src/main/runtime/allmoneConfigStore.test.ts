@@ -267,3 +267,45 @@ test('persists encrypted local output key records without plaintext values', asy
     assert(raw.includes('valueEncrypted'))
   })
 })
+
+test('persists non-secret Provider id sidecar records', async () => {
+  await withTempRuntimeHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({ homeDir, platform: 'darwin' })
+    const store = createAllmoneConfigStore({ runtimeHome })
+
+    await store.save({
+      providerIds: [
+        {
+          providerKind: 'gemini-api-key',
+          entryIndex: 0,
+          providerId: 'gemini_work'
+        },
+        {
+          providerKind: 'openai-compatibility',
+          entryIndex: 1,
+          providerId: 'openrouter_work'
+        }
+      ]
+    })
+
+    const loaded = await store.load()
+    const raw = await readFile(runtimeHome.configPath, 'utf8')
+    const parsed = parse(raw)
+
+    assert.deepEqual(loaded.providerIds, [
+      {
+        providerKind: 'gemini-api-key',
+        entryIndex: 0,
+        providerId: 'gemini_work'
+      },
+      {
+        providerKind: 'openai-compatibility',
+        entryIndex: 1,
+        providerId: 'openrouter_work'
+      }
+    ])
+    assert.deepEqual(parsed.providerIds, loaded.providerIds)
+    assert(!raw.includes('api-key:'))
+    assert(!raw.includes('secret'))
+  })
+})

@@ -18,6 +18,7 @@ const noProviderLogic: Pick<
 
 const apiKeyFields: UpstreamEditableFieldName[] = [
   'apiKey',
+  'providerId',
   'baseUrl',
   'prefix',
   'disabled',
@@ -45,7 +46,7 @@ function apiKeyEntry(
   kind: UpstreamProviderKind,
   label: string,
   route: string,
-  required: UpstreamEditableFieldName[] = ['apiKey']
+  required: UpstreamEditableFieldName[] = ['apiKey', 'providerId']
 ): UpstreamProviderCatalogEntry {
   const secretFields: UpstreamEditableFieldName[] = [
     'apiKey',
@@ -197,6 +198,7 @@ export const UPSTREAM_PROVIDER_CATALOG: UpstreamProviderCatalogEntry[] = [
     editableFields: fields(
       [
         'providerName',
+        'providerId',
         'disabled',
         'apiKeyEntries',
         'baseUrl',
@@ -207,7 +209,7 @@ export const UPSTREAM_PROVIDER_CATALOG: UpstreamProviderCatalogEntry[] = [
         'excludedModels'
       ],
       {
-        required: ['providerName', 'baseUrl', 'apiKeyEntries'],
+        required: ['providerName', 'providerId', 'baseUrl', 'apiKeyEntries'],
         secrets: ['apiKeyEntries', 'headers', 'proxyUrl']
       }
     ),

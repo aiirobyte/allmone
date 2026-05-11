@@ -7,14 +7,41 @@ export interface ProviderModelAliasRow {
   [key: string]: unknown
 }
 
+export const PROVIDER_ID_PATTERN = /^[A-Za-z0-9_]+$/
+
 export interface ReconcileModelAliasesInput {
   existingAliases: ProviderModelAliasRow[]
   upstreamModelIds: string[]
 }
 
+export interface ReconcileGeneratedModelAliasesInput
+  extends ReconcileModelAliasesInput {
+  providerId: string
+}
+
 export interface ReconcileModelAliasesResult {
   aliases: ProviderModelAliasRow[]
   changed: boolean
+}
+
+export function isValidProviderId(value: unknown): value is string {
+  return typeof value === 'string' && PROVIDER_ID_PATTERN.test(value)
+}
+
+export function validateProviderId(value: unknown): string {
+  if (!isValidProviderId(value)) {
+    throw new Error('Provider id must use only letters, numbers, and underscores')
+  }
+
+  return value
+}
+
+export function buildGeneratedModelAlias(
+  providerId: string,
+  rawModelId: string
+): string {
+  validateProviderId(providerId)
+  return `${providerId}-${rawModelId}`
 }
 
 export function projectEffectiveModelRows(
@@ -86,6 +113,53 @@ export function reconcileModelAliases(
   }
 }
 
+export function reconcileGeneratedModelAliases(
+  input: ReconcileGeneratedModelAliasesInput
+): ReconcileModelAliasesResult {
+  const providerId = validateProviderId(input.providerId)
+  const aliases = input.existingAliases.map((row) => ({ ...row }))
+  const byName = new Map<string, number>()
+  let changed = false
+
+  aliases.forEach((row, index) => {
+    const name = getModelId(row.name)
+
+    if (name && !byName.has(name)) {
+      byName.set(name, index)
+    }
+  })
+
+  for (const modelId of input.upstreamModelIds) {
+    const name = getModelId(modelId)
+
+    if (!name) {
+      continue
+    }
+
+    const alias = buildGeneratedModelAlias(providerId, name)
+    const index = byName.get(name)
+
+    if (index === undefined) {
+      byName.set(name, aliases.length)
+      aliases.push({ name, alias, fork: true })
+      changed = true
+      continue
+    }
+
+    const current = aliases[index]
+
+    if (current.name !== name || current.alias !== alias || current.fork !== true) {
+      aliases[index] = { ...current, name, alias, fork: true }
+      changed = true
+    }
+  }
+
+  return {
+    aliases,
+    changed
+  }
+}
+
 function pushConfiguredRow(
   rows: ModelInventoryModelRow[],
   seen: Set<string>,
@@ -110,6 +184,10 @@ function normalizeModelId(value: unknown): string | undefined {
 
 function getString(value: unknown): string | undefined {
   return normalizeModelId(value)
+}
+
+function getModelId(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

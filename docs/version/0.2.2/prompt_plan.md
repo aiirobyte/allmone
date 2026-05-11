@@ -94,7 +94,7 @@ Expected next change:
 3. Confirm `Models` refresh does not display merged CLIProxyAPI rows for API-key/OpenAI-compatible Providers.
 4. Add regression tests that the OpenAI-compatible fallback uses only that Provider's configured `/models` response and redacts all provider secrets from errors and renderer payloads.
 5. Update `docs/version/0.2.2/todo.md` as prompts complete.
-6. Update root docs and `docs/version/README.md` when v0.2.2 is complete, then return the roadmap to v0.3.0 planning.
+6. Update root docs and `docs/version/README.md` when v0.2.2 is complete, then hand off to v0.2.3 Provider output model definition.
 7. Verify with `bun run test`, `bun run typecheck`, and `bun run build`.
 
 Guardrails:
@@ -110,7 +110,7 @@ Guardrails:
 - [x] OpenAI-compatible upstream `/models` fallback.
 - [x] `Models` refresh uses final exposed model lists.
 - [x] MIMO/Codex and secret-boundary regressions.
-- [x] Root docs updated for v0.2.2 completion and v0.3.0 handoff.
+- [x] Root docs updated for v0.2.2 completion and v0.2.3 handoff.
 - [x] `bun run test`.
 - [x] `bun run typecheck`.
 - [x] `bun run build`.

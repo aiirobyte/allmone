@@ -36,6 +36,7 @@ export type SafeEndpointKind = 'api'
 export type UpstreamApiFormInput = {
   providerKind: UpstreamProviderKind
   entryIndex?: number
+  providerId?: string
   apiKey?: string
   providerName?: string
   baseUrl?: string

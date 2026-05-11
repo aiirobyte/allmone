@@ -140,6 +140,7 @@ test('renders multiple provider entries with delete actions without raw secrets'
             entries: [
               {
                 'api-key': 'gemini-secret-one',
+                providerId: 'gemini_work',
                 'base-url': 'https://gemini.example.com',
                 models: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
                 'excluded-models': ['gemini-1.0-pro']
@@ -159,6 +160,7 @@ test('renders multiple provider entries with delete actions without raw secrets'
             entries: [
               {
                 name: 'openrouter',
+                providerId: 'openrouter_work',
                 baseUrl: 'https://openrouter.ai/api/v1',
                 apiKeyEntries: [{ 'api-key': '[REDACTED]' }]
               },
@@ -182,6 +184,8 @@ test('renders multiple provider entries with delete actions without raw secrets'
   )
 
   assert.match(html, /Gemini API key/)
+  assert.match(html, /Provider ID/)
+  assert.match(html, /gemini_work/)
   assert.match(html, /2 entries/)
   assert.match(html, /https:\/\/gemini\.example\.com/)
   assert.match(html, /Edit/)
@@ -191,6 +195,7 @@ test('renders multiple provider entries with delete actions without raw secrets'
   assert.match(html, /gemini-1\.0-pro/)
   assert.match(html, /OpenAI-compatible provider/)
   assert.match(html, /Provider Name/)
+  assert.match(html, /openrouter_work/)
   assert.match(html, /openrouter/)
   assert.match(html, /custom-openai/)
   assert.match(html, /https:\/\/custom\.example\.com\/v1/)

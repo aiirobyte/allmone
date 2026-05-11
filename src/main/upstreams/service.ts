@@ -5,6 +5,7 @@ import {
   redactApiKey,
   redactCliProxyApiText,
   redactUrlCredentials,
+  type CliProxyApiAllmoneMetadata,
   type CliProxyApiAmpCodeConfig,
   type CliProxyApiApiKeyDeleteInput,
   type CliProxyApiApiKeyPatchInput,
@@ -25,6 +26,11 @@ import {
   type CliProxyApiUpstreamApiKeySectionResult,
   type CliProxyApiWriteResult
 } from '../cli-proxy-api'
+import { validateProviderId } from '../models/modelAlias'
+import type {
+  AllmoneConfigStore,
+  AllmoneProviderIdConfigRecord
+} from '../runtime/allmoneConfigStore'
 import {
   UPSTREAM_PROVIDER_CATALOG,
   UPSTREAM_PROVIDER_KINDS,
@@ -123,6 +129,7 @@ export interface UpstreamServiceClient {
 
 export interface UpstreamServiceOptions {
   client: UpstreamServiceClient
+  configStore?: AllmoneConfigStore
 }
 
 export interface UpstreamService {
@@ -178,11 +185,14 @@ export interface UpstreamService {
 export function createUpstreamService(
   options: UpstreamServiceOptions
 ): UpstreamService {
-  return new DefaultUpstreamService(options.client)
+  return new DefaultUpstreamService(options.client, options.configStore)
 }
 
 class DefaultUpstreamService implements UpstreamService {
-  constructor(private readonly client: UpstreamServiceClient) {}
+  constructor(
+    private readonly client: UpstreamServiceClient,
+    private readonly configStore?: AllmoneConfigStore
+  ) {}
 
   getProviderCatalog(): UpstreamProviderCatalogEntry[] {
     return UPSTREAM_PROVIDER_CATALOG.map((entry) => ({
@@ -278,7 +288,8 @@ class DefaultUpstreamService implements UpstreamService {
         amp,
         authFiles,
         oauthAliases,
-        oauthExcluded
+        oauthExcluded,
+        providerIdRecords
       ] = await Promise.all([
         this.getLocalApiKeyState(),
         this.client.getGeminiApiKeyEntries(),
@@ -289,7 +300,8 @@ class DefaultUpstreamService implements UpstreamService {
         this.client.getAmpCodeConfig(),
         this.getAuthFileSummaries(),
         this.client.getOauthModelAlias(),
-        this.client.getOauthExcludedModels()
+        this.client.getOauthExcludedModels(),
+        this.loadProviderIdRecords()
       ])
 
       const summaries: UpstreamProviderSummary[] = [
@@ -300,11 +312,11 @@ class DefaultUpstreamService implements UpstreamService {
           redactedFields: ['apiKey'],
           entries: localKeys.redactedKeys
         },
-        summarizeApiKeySection('gemini-api-key', gemini.entries),
-        summarizeApiKeySection('codex-api-key', codex.entries),
-        summarizeApiKeySection('claude-api-key', claude.entries),
-        summarizeApiKeySection('vertex-api-key', vertex.entries),
-        summarizeOpenAiCompatibility(openaiCompatibility),
+        summarizeApiKeySection('gemini-api-key', gemini.entries, providerIdRecords),
+        summarizeApiKeySection('codex-api-key', codex.entries, providerIdRecords),
+        summarizeApiKeySection('claude-api-key', claude.entries, providerIdRecords),
+        summarizeApiKeySection('vertex-api-key', vertex.entries, providerIdRecords),
+        summarizeOpenAiCompatibility(openaiCompatibility, providerIdRecords),
         summarizeAmp(amp.config)
       ]
 
@@ -330,11 +342,20 @@ class DefaultUpstreamService implements UpstreamService {
   ): Promise<CliProxyApiWriteResult> {
     return withSanitizedErrors(async () => {
       const providerKind = requireApiKeyProvider(input.providerKind)
+      const providerId = validateProviderId(input.providerId)
+
+      await this.assertProviderIdUnique(providerId, {
+        providerKind,
+        entryIndex: input.entryIndex
+      })
 
       if (providerKind === 'openai-compatibility') {
-        return this.client.upsertOpenAiCompatibilityProvider(
+        const targetIndex = await this.resolveOpenAiCompatibilityTargetIndex(input)
+        const result = await this.client.upsertOpenAiCompatibilityProvider(
           await this.toOpenAiCompatibilityInput(input)
         )
+        await this.saveProviderIdAssignment(providerKind, targetIndex, providerId)
+        return result
       }
 
       if (typeof input.entryIndex !== 'number' && !input.apiKey?.trim()) {
@@ -342,9 +363,12 @@ class DefaultUpstreamService implements UpstreamService {
       }
 
       const current = await this.getApiKeyEntries(providerKind)
+      const targetIndex = resolveApiKeyTargetIndex(current.entries, input)
       const next = mergeApiKeyEntries(current, input)
 
-      return this.putApiKeyEntries(providerKind, next)
+      const result = await this.putApiKeyEntries(providerKind, next)
+      await this.saveProviderIdAssignment(providerKind, targetIndex, providerId)
+      return result
     })
   }
 
@@ -356,25 +380,43 @@ class DefaultUpstreamService implements UpstreamService {
       const kind = requireApiKeyProvider(providerKind)
 
       if (kind === 'openai-compatibility') {
+        const targetIndex = await this.resolveOpenAiCompatibilityDeleteIndex(input)
+        let result: CliProxyApiWriteResult
+
         if ('index' in input && typeof input.index === 'number') {
-          return this.client.deleteOpenAiCompatibilityProvider({ index: input.index })
+          result = await this.client.deleteOpenAiCompatibilityProvider({
+            index: input.index
+          })
+        } else {
+          result = await this.client.deleteOpenAiCompatibilityProvider({
+            name: input.apiKey
+          })
         }
 
-        return this.client.deleteOpenAiCompatibilityProvider({
-          name: input.apiKey
-        })
+        await this.deleteProviderIdAssignment(kind, targetIndex)
+        return result
       }
+
+      const targetIndex = await this.resolveApiKeyDeleteIndex(kind, input)
+      let result: CliProxyApiWriteResult
 
       switch (kind) {
         case 'gemini-api-key':
-          return this.client.deleteGeminiApiKeyEntry(input)
+          result = await this.client.deleteGeminiApiKeyEntry(input)
+          break
         case 'codex-api-key':
-          return this.client.deleteCodexApiKeyEntry(input)
+          result = await this.client.deleteCodexApiKeyEntry(input)
+          break
         case 'claude-api-key':
-          return this.client.deleteClaudeApiKeyEntry(input)
+          result = await this.client.deleteClaudeApiKeyEntry(input)
+          break
         case 'vertex-api-key':
-          return this.client.deleteVertexApiKeyEntry(input)
+          result = await this.client.deleteVertexApiKeyEntry(input)
+          break
       }
+
+      await this.deleteProviderIdAssignment(kind, targetIndex)
+      return result
     })
   }
 
@@ -388,7 +430,10 @@ class DefaultUpstreamService implements UpstreamService {
         throw new Error('OpenAI-compatible providers are not API-key sections')
       }
 
-      return (await this.getApiKeyEntries(kind)).entries
+      return this.applyProviderIdRecords(
+        kind,
+        (await this.getApiKeyEntries(kind)).entries
+      )
     })
   }
 
@@ -411,7 +456,10 @@ class DefaultUpstreamService implements UpstreamService {
     CliProxyApiOpenAiCompatibilityProvider[]
   > {
     return withSanitizedErrors(async () =>
-      (await this.client.getOpenAiCompatibilityProviders()).providers
+      this.applyProviderIdRecords(
+        'openai-compatibility',
+        (await this.client.getOpenAiCompatibilityProviders()).providers
+      )
     )
   }
 
@@ -615,6 +663,166 @@ class DefaultUpstreamService implements UpstreamService {
 
     return mergeOpenAiCompatibilityProvider(existing, input)
   }
+
+  private async assertProviderIdUnique(
+    providerId: string,
+    target: {
+      providerKind: ApiKeyProviderKind
+      entryIndex?: number
+    }
+  ): Promise<void> {
+    const [
+      gemini,
+      codex,
+      claude,
+      vertex,
+      openaiCompatibility,
+      providerIdRecords
+    ] = await Promise.all([
+      this.client.getGeminiApiKeyEntries(),
+      this.client.getCodexApiKeyEntries(),
+      this.client.getClaudeApiKeyEntries(),
+      this.client.getVertexApiKeyEntries(),
+      this.client.getOpenAiCompatibilityProviders(),
+      this.loadProviderIdRecords()
+    ])
+    const assignments: Array<{
+      providerKind: ApiKeyProviderKind
+      entryIndex: number
+      providerId: string | undefined
+    }> = [
+      ...providerIdAssignments('gemini-api-key', gemini.entries, providerIdRecords),
+      ...providerIdAssignments('codex-api-key', codex.entries, providerIdRecords),
+      ...providerIdAssignments('claude-api-key', claude.entries, providerIdRecords),
+      ...providerIdAssignments('vertex-api-key', vertex.entries, providerIdRecords),
+      ...providerIdAssignments(
+        'openai-compatibility',
+        openaiCompatibility.providers,
+        providerIdRecords
+      )
+    ]
+
+    for (const assignment of assignments) {
+      const sameTarget =
+        assignment.providerKind === target.providerKind &&
+        assignment.entryIndex === target.entryIndex
+
+      if (!sameTarget && assignment.providerId === providerId) {
+        throw new Error('Provider id must be unique')
+      }
+    }
+  }
+
+  private async resolveOpenAiCompatibilityTargetIndex(
+    input: UpstreamApiKeyCredentialInput
+  ): Promise<number> {
+    const current = await this.client.getOpenAiCompatibilityProviders()
+
+    if (typeof input.entryIndex === 'number') {
+      if (input.entryIndex < 0 || input.entryIndex >= current.providers.length) {
+        throw new Error('OpenAI-compatible provider entry not found')
+      }
+
+      return input.entryIndex
+    }
+
+    const providerName = input.providerName?.trim()
+    const existingIndex = current.providers.findIndex(
+      (provider) => provider.name?.trim() === providerName
+    )
+
+    return existingIndex >= 0 ? existingIndex : current.providers.length
+  }
+
+  private async resolveOpenAiCompatibilityDeleteIndex(
+    input: CliProxyApiUpstreamApiKeyDeleteInput
+  ): Promise<number | undefined> {
+    if ('index' in input && typeof input.index === 'number') {
+      return input.index
+    }
+
+    const current = await this.client.getOpenAiCompatibilityProviders()
+    const index = current.providers.findIndex(
+      (provider) => provider.name?.trim() === input.apiKey
+    )
+
+    return index >= 0 ? index : undefined
+  }
+
+  private async resolveApiKeyDeleteIndex(
+    providerKind: Exclude<ApiKeyProviderKind, 'openai-compatibility'>,
+    input: CliProxyApiUpstreamApiKeyDeleteInput
+  ): Promise<number | undefined> {
+    if ('index' in input && typeof input.index === 'number') {
+      return input.index
+    }
+
+    const current = await this.getApiKeyEntries(providerKind)
+    const index = current.entries.findIndex(
+      (entry) => entry['api-key'] === input.apiKey
+    )
+
+    return index >= 0 ? index : undefined
+  }
+
+  private async applyProviderIdRecords<
+    T extends CliProxyApiUpstreamApiKeyEntry | CliProxyApiOpenAiCompatibilityProvider
+  >(providerKind: ApiKeyProviderKind, entries: T[]): Promise<T[]> {
+    const records = await this.loadProviderIdRecords()
+
+    return entries.map((entry, entryIndex) =>
+      withProviderId(
+        entry,
+        getProviderId(entry, findProviderIdRecord(records, providerKind, entryIndex))
+      )
+    )
+  }
+
+  private async loadProviderIdRecords(): Promise<AllmoneProviderIdConfigRecord[]> {
+    return (await this.configStore?.load())?.providerIds ?? []
+  }
+
+  private async saveProviderIdAssignment(
+    providerKind: ApiKeyProviderKind,
+    entryIndex: number,
+    providerId: string
+  ): Promise<void> {
+    if (!this.configStore) {
+      return
+    }
+
+    const config = await this.configStore.load()
+    const next = upsertProviderIdRecord(config.providerIds, {
+      providerKind,
+      entryIndex,
+      providerId
+    })
+
+    await this.configStore.save({ providerIds: next })
+  }
+
+  private async deleteProviderIdAssignment(
+    providerKind: ApiKeyProviderKind,
+    entryIndex: number | undefined
+  ): Promise<void> {
+    if (!this.configStore || entryIndex === undefined) {
+      return
+    }
+
+    const config = await this.configStore.load()
+    const next = config.providerIds
+      .filter(
+        (record) =>
+          record.providerKind !== providerKind || record.entryIndex !== entryIndex
+      )
+      .map((record) =>
+        record.providerKind === providerKind && record.entryIndex > entryIndex
+          ? { ...record, entryIndex: record.entryIndex - 1 }
+          : record
+      )
+
+    await this.configStore.save({ providerIds: next })
+  }
 }
 
 const apiKeyProviderKinds = [
@@ -697,30 +905,47 @@ function modelIdsFromRecords(records: CliProxyApiModelRecord[]): string[] {
 
 function summarizeApiKeySection(
   providerKind: UpstreamProviderKind,
-  entries: CliProxyApiUpstreamApiKeyEntry[]
+  entries: CliProxyApiUpstreamApiKeyEntry[],
+  providerIdRecords: AllmoneProviderIdConfigRecord[]
 ): UpstreamProviderSummary {
   return {
     providerKind,
     label: getLabel(providerKind),
     configured: entries.length > 0,
     redactedFields: ['apiKey', 'headers', 'proxyUrl'],
-    entries: entries.map(redactApiKeyEntry)
+    entries: entries.map((entry, entryIndex) =>
+      redactApiKeyEntry(
+        entry,
+        findProviderIdRecord(providerIdRecords, providerKind, entryIndex)
+      )
+    )
   }
 }
 
 function summarizeOpenAiCompatibility(
-  result: CliProxyApiOpenAiCompatibilityResult
+  result: CliProxyApiOpenAiCompatibilityResult,
+  providerIdRecords: AllmoneProviderIdConfigRecord[]
 ): UpstreamProviderSummary {
   return {
     providerKind: 'openai-compatibility',
     label: getLabel('openai-compatibility'),
     configured: result.providers.length > 0,
     redactedFields: ['apiKeyEntries', 'headers', 'proxyUrl'],
-    entries: result.providers.map((provider) => ({
+    entries: result.providers.map((provider, entryIndex) => ({
       name: provider.name,
+      providerId: getProviderId(
+        provider,
+        findProviderIdRecord(
+          providerIdRecords,
+          'openai-compatibility',
+          entryIndex
+        )
+      ),
       disabled: provider.disabled,
       baseUrl: provider['base-url'],
-      apiKeyEntries: (provider['api-key-entries'] ?? []).map(redactApiKeyEntry),
+      apiKeyEntries: (provider['api-key-entries'] ?? []).map((entry) =>
+        redactApiKeyEntry(entry)
+      ),
       models: provider.models ?? [],
       headers: redactHeaders(provider.headers)
     }))
@@ -742,6 +967,7 @@ function toApiKeyEntry(
 ): CliProxyApiUpstreamApiKeyEntry {
   return compactObject({
     'api-key': input.apiKey,
+    allmone: toAllmoneMetadata(input.providerId),
     'base-url': input.baseUrl,
     prefix: input.prefix,
     disabled: input.disabled,
@@ -766,7 +992,8 @@ function mergeApiKeyEntries(
 
     entries[input.entryIndex] = compactObject({
       ...entries[input.entryIndex],
-      ...newEntry
+      ...newEntry,
+      allmone: mergeAllmoneMetadata(entries[input.entryIndex], input.providerId)
     })
     return entries
   }
@@ -779,7 +1006,8 @@ function mergeApiKeyEntries(
   if (index >= 0) {
     entries[index] = compactObject({
       ...entries[index],
-      ...newEntry
+      ...newEntry,
+      allmone: mergeAllmoneMetadata(entries[index], input.providerId)
     })
     return entries
   }
@@ -803,6 +1031,7 @@ function toOpenAiCompatibilityInput(
 
   return {
     name: input.providerName,
+    allmone: toAllmoneMetadata(input.providerId),
     disabled: input.disabled,
     'base-url': input.baseUrl,
     'api-key-entries': toCliProxyApiKeyEntries(input.apiKeyEntries),
@@ -827,13 +1056,16 @@ function mergeOpenAiCompatibilityProvider(
 
   return {
     name,
+    allmone: mergeAllmoneMetadata(existing, input.providerId),
     disabled: input.disabled ?? existing.disabled,
     'base-url': baseUrl,
     'api-key-entries': input.apiKeyEntries?.some((entry) => entry.apiKey?.trim())
       ? toCliProxyApiKeyEntries(input.apiKeyEntries)
       : existing['api-key-entries'],
     headers: input.headers ? toHeaderRecord(input.headers) : existing.headers,
-    models: toCliProxyApiModelAliases(input.modelAliases)
+    models: input.modelAliases
+      ? toCliProxyApiModelAliases(input.modelAliases)
+      : existing.models
   }
 }
 
@@ -861,6 +1093,125 @@ function toCliProxyApiModelAliases(
   )
 }
 
+function providerIdAssignments(
+  providerKind: ApiKeyProviderKind,
+  entries: Array<CliProxyApiUpstreamApiKeyEntry | CliProxyApiOpenAiCompatibilityProvider>,
+  providerIdRecords: AllmoneProviderIdConfigRecord[]
+): Array<{
+  providerKind: ApiKeyProviderKind
+  entryIndex: number
+  providerId: string | undefined
+}> {
+  return entries.map((entry, entryIndex) => ({
+    providerKind,
+    entryIndex,
+    providerId: getProviderId(
+      entry,
+      findProviderIdRecord(providerIdRecords, providerKind, entryIndex)
+    )
+  }))
+}
+
+function getProviderId(
+  entry: CliProxyApiUpstreamApiKeyEntry | CliProxyApiOpenAiCompatibilityProvider,
+  fallback?: string
+): string | undefined {
+  return stringValue(entry.allmone?.providerId) ?? fallback
+}
+
+function toAllmoneMetadata(
+  providerId: string | undefined
+): CliProxyApiAllmoneMetadata | undefined {
+  return providerId ? { providerId } : undefined
+}
+
+function mergeAllmoneMetadata(
+  existing: CliProxyApiUpstreamApiKeyEntry | CliProxyApiOpenAiCompatibilityProvider,
+  providerId: string | undefined
+): CliProxyApiAllmoneMetadata | undefined {
+  const current =
+    typeof existing.allmone === 'object' &&
+    existing.allmone !== null &&
+    !Array.isArray(existing.allmone)
+      ? existing.allmone
+      : undefined
+
+  return providerId
+    ? {
+        ...current,
+        providerId
+      }
+    : current
+}
+
+function resolveApiKeyTargetIndex(
+  entries: CliProxyApiUpstreamApiKeyEntry[],
+  input: UpstreamApiKeyCredentialInput
+): number {
+  if (typeof input.entryIndex === 'number') {
+    if (input.entryIndex < 0 || input.entryIndex >= entries.length) {
+      throw new Error('API-key upstream entry not found')
+    }
+
+    return input.entryIndex
+  }
+
+  if (input.matchApiKey) {
+    const index = entries.findIndex((entry) => entry['api-key'] === input.matchApiKey)
+
+    if (index >= 0) {
+      return index
+    }
+  }
+
+  return entries.length
+}
+
+function findProviderIdRecord(
+  records: AllmoneProviderIdConfigRecord[],
+  providerKind: UpstreamProviderKind,
+  entryIndex: number
+): string | undefined {
+  return records.find(
+    (record) =>
+      record.providerKind === providerKind && record.entryIndex === entryIndex
+  )?.providerId
+}
+
+function withProviderId<
+  T extends CliProxyApiUpstreamApiKeyEntry | CliProxyApiOpenAiCompatibilityProvider
+>(entry: T, providerId: string | undefined): T {
+  if (!providerId) {
+    return { ...entry }
+  }
+
+  return {
+    ...entry,
+    allmone: {
+      ...(typeof entry.allmone === 'object' &&
+      entry.allmone !== null &&
+      !Array.isArray(entry.allmone)
+        ? entry.allmone
+        : {}),
+      providerId
+    }
+  }
+}
+
+function upsertProviderIdRecord(
+  records: AllmoneProviderIdConfigRecord[],
+  nextRecord: AllmoneProviderIdConfigRecord
+): AllmoneProviderIdConfigRecord[] {
+  const next = records.filter(
+    (record) =>
+      record.providerKind !== nextRecord.providerKind ||
+      record.entryIndex !== nextRecord.entryIndex
+  )
+
+  next.push(nextRecord)
+  return next
+}
+
 function compactObject<T extends Record<string, unknown>>(value: T): T {
   return Object.fromEntries(
     Object.entries(value).filter(([, item]) => item !== undefined)
@@ -881,9 +1232,13 @@ function toHeaderRecord(
   )
 }
 
-function redactApiKeyEntry(entry: CliProxyApiUpstreamApiKeyEntry): Record<string, unknown> {
+function redactApiKeyEntry(
+  entry: CliProxyApiUpstreamApiKeyEntry,
+  providerId?: string
+): Record<string, unknown> {
   return {
     ...entry,
+    providerId: getProviderId(entry, providerId),
     'api-key': redactApiKey(entry['api-key']),
     'proxy-url': entry['proxy-url']
       ? redactUrlCredentials(entry['proxy-url'])

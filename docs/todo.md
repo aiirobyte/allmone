@@ -12,8 +12,8 @@ Read CLAUDE.md and docs/todo.md, then continue with the active version's next un
 
 Active version: `0.3.0` planning
 
-- Previous version: `docs/version/0.2.2/`
-- Active version docs: create `docs/version/0.3.0/` during planning setup.
+- Previous version: `docs/version/0.2.3/`
+- Active version docs: create `docs/version/0.3.0/` before implementation.
 
 ## Current Target
 
@@ -98,14 +98,29 @@ Definition of done:
 - [x] Run `bun run test`.
 - [x] Run `bun run typecheck`.
 - [x] Run `bun run build`.
+- [x] Create `docs/version/0.2.3/spec.md`.
+- [x] Create `docs/version/0.2.3/prompt_plan.md`.
+- [x] Create `docs/version/0.2.3/todo.md`.
+- [x] Define Provider id validation for API-key/OpenAI-compatible Providers.
+- [x] Generate API-key/OpenAI-compatible aliases as `<provider_id>-<raw_model_id>`.
+- [x] Set `fork: true` on all allmone-generated API-key/OpenAI-compatible aliases.
+- [x] Leave OAuth/auth-file Provider aliases to CLIProxyAPI built-in rules.
+- [x] Add Provider id UI and IPC validation.
+- [x] Add same-raw-model duplicate Provider regressions.
+- [x] Run `bun run test`.
+- [x] Run `bun run typecheck`.
+- [x] Run `bun run build`.
+- [ ] Create `docs/version/0.3.0/spec.md`.
+- [ ] Create `docs/version/0.3.0/prompt_plan.md`.
+- [ ] Create `docs/version/0.3.0/todo.md`.
 
 ## Next Prompt
 
-Start v0.3.0 planning setup.
+Start v0.3.0 Prompt 0.
 
 Expected next change:
 
-- Create `docs/version/0.3.0/` planning files for deeper model resource inventory.
+- Create the v0.3.0 Model Resource Inventory planning files before implementation.
 
 ## Version Roadmap
 
@@ -119,6 +134,7 @@ Expected next change:
 - [x] v0.2.0 Auth Management Surface: multiple persisted auth files and providers through CLIProxyAPI.
 - [x] v0.2.1 Models Module And Named Output Keys: model-first provider/model list plus persistent named local output keys.
 - [x] v0.2.2 Provider Model Alias Sync: seed missing identity aliases per Provider and display final exposed model IDs.
+- [x] v0.2.3 Provider Output Model Definition: generate Provider-specific aliases with `fork: true` for API-key/OpenAI-compatible Providers.
 - [ ] v0.3.0 Model Resource Inventory: deeper model resource inventory with backing provider/auth details.
 - [ ] v0.4.0 Usage And Logs: request log, usage, queue, and error visibility.
 - [ ] v0.5.0 Local Network Sharing: safe localhost/public-interface controls through CLIProxyAPI.
@@ -166,5 +182,8 @@ Expected next change:
 - 2026-05-11: Corrected Models refresh after local verification showed CLIProxyAPI v6.10.9 returns the same merged models response for `/api/provider/{provider}/.../models`, even for unknown providers. Account rows still read CLIProxyAPI model output, while API-key/OpenAI-compatible rows now read only their configured `models` entries from CLIProxyAPI-backed provider config, so MIMO no longer inherits Codex's merged model list.
 - 2026-05-11: User clarified the desired model behavior: each Provider's upstream models should be represented in that Provider's CLIProxyAPI alias config. Missing aliases should become identity aliases, explicit aliases should remain authoritative, and `Models` should display final exposed model IDs under the Provider row. Created `docs/version/0.2.2/` planning files and deferred broader v0.3.0 inventory work.
 - 2026-05-11: Updated v0.2.2 planning so CLIProxyAPI remains the preferred Provider-scoped discovery source, but OpenAI-compatible Providers use a main-process upstream `/models` fallback when CLIProxyAPI cannot provide reliable Provider-scoped model discovery.
-- 2026-05-11: v0.2.2 completed. Added effective alias projection, Provider alias sync, OpenAI-compatible fallback discovery, account/OAuth alias sync, sync-unavailable renderer state, and MIMO/Codex plus secret-boundary regressions. Next work returns to v0.3.0 planning.
+- 2026-05-11: v0.2.2 completed. Added effective alias projection, Provider alias sync, OpenAI-compatible fallback discovery, account/OAuth alias sync, sync-unavailable renderer state, and MIMO/Codex plus secret-boundary regressions.
+- 2026-05-11: User inserted v0.2.3 before v0.3.0 for Provider output model definition. API-key/OpenAI-compatible aliases should be `<provider_id>-<raw_model_id>` with `fork: true`; OAuth/auth-file Providers keep CLIProxyAPI built-in alias behavior.
+- 2026-05-11: v0.2.3 completed. Provider id is persisted in allmone config sidecar records for API-key/OpenAI-compatible CLIProxyAPI entries; API-key/OpenAI-compatible aliases now generate as `<provider_id>-<raw_model_id>` with `fork: true`; OAuth/auth-file Providers are skipped by allmone alias generation. Verified with `bun run test`, `bun run typecheck`, and `bun run build`.
+- 2026-05-11: Fixed v0.2.3 Provider id saves after CLIProxyAPI dropped unknown `allmone` metadata. allmone now reads/writes Provider ids from `~/.allmone/config.yaml` sidecar records and overlays them onto Provider rows before summaries, editing, and alias sync.
 - Update this file and the active version todo after every meaningful coding session.

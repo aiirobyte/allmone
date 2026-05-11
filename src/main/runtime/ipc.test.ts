@@ -424,6 +424,7 @@ test('validates provider upsert and delete payloads before calling service', asy
 
   await ipc.invoke(RUNTIME_IPC_CHANNELS.upsertOpenAiProvider, {
     name: 'openrouter',
+    providerId: 'openrouter_work',
     disabled: false,
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: 'provider-secret',
@@ -550,6 +551,7 @@ test('validates upstream IPC payloads before calling upstream services', async (
   await ipc.invoke(RUNTIME_IPC_CHANNELS.upsertApiKeyUpstream, {
     providerKind: 'gemini-api-key',
     entryIndex: 0,
+    providerId: 'gemini_work',
     apiKey: 'provider-secret',
     modelAliases: [{ name: 'gemini-2.5-pro', alias: 'pro' }],
     excludedModels: [{ pattern: 'gemini-1.0-pro' }]
@@ -578,6 +580,13 @@ test('validates upstream IPC payloads before calling upstream services', async (
       error.message === 'Invalid runtime IPC payload' &&
       !error.message.includes('provider-secret')
   )
+  await assert.rejects(async () => {
+    await ipc.invoke(RUNTIME_IPC_CHANNELS.upsertApiKeyUpstream, {
+      providerKind: 'gemini-api-key',
+      providerId: 'bad-id',
+      apiKey: 'provider-secret'
+    })
+  })
 
   assert.deepEqual(upstreamService.calls, [
     'catalog',

@@ -21,6 +21,7 @@ export interface AllmoneSoftwareConfig {
     releasePageUrl: string
     localExecutablePath: string
   }
+  providerIds: AllmoneProviderIdConfigRecord[]
   localOutputKeys: AllmoneLocalOutputKeyConfigRecord[]
   runtime: {
     host: string
@@ -39,7 +40,14 @@ export interface AllmoneSoftwareConfigInput {
     runtime?: Partial<AllmoneSoftwareConfig['runtime']>
   }
   localOutputKeys?: AllmoneLocalOutputKeyConfigRecord[]
+  providerIds?: AllmoneProviderIdConfigRecord[]
   runtime?: Partial<AllmoneSoftwareConfig['runtime']>
+}
+
+export interface AllmoneProviderIdConfigRecord {
+  providerKind: string
+  entryIndex: number
+  providerId: string
 }
 
 export interface AllmoneLocalOutputKeyConfigRecord {
@@ -109,6 +117,7 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
           ...input.runtime
         }
       },
+      providerIds: input.providerIds ?? current.providerIds,
       localOutputKeys: input.localOutputKeys ?? current.localOutputKeys
     })
 
@@ -168,6 +177,7 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
     const host = normalizeHost(runtime.host)
     const port = normalizePort(runtime.port)
     const timeoutMs = normalizeTimeoutMs(runtime.timeoutMs)
+    const providerIds = normalizeProviderIds(record.providerIds)
     const localOutputKeys = normalizeLocalOutputKeys(record.localOutputKeys)
 
     return {
@@ -188,6 +198,7 @@ class FileAllmoneConfigStore implements AllmoneConfigStore {
           this.runtimeHome
         )
       },
+      providerIds,
       localOutputKeys,
       runtime: {
         host,
@@ -274,6 +285,50 @@ function normalizeTimeoutMs(value: unknown): number {
   }
 
   return Math.round(value)
+}
+
+const PROVIDER_ID_PATTERN = /^[A-Za-z0-9_]+$/
+
+function normalizeProviderIds(value: unknown): AllmoneProviderIdConfigRecord[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const seen = new Set<string>()
+  const records: AllmoneProviderIdConfigRecord[] = []
+
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+      continue
+    }
+
+    const record = item as Record<string, unknown>
+    const providerKind = normalizeTrimmedString(record.providerKind)
+    const providerId = normalizeTrimmedString(record.providerId)
+    const entryIndex = record.entryIndex
+
+    if (
+      !providerKind ||
+      !providerId ||
+      !PROVIDER_ID_PATTERN.test(providerId) ||
+      typeof entryIndex !== 'number' ||
+      !Number.isInteger(entryIndex) ||
+      entryIndex < 0
+    ) {
+      continue
+    }
+
+    const key = providerIdAssignmentKey(providerKind, entryIndex)
+
+    if (seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    records.push({ providerKind, entryIndex, providerId })
+  }
+
+  return records
 }
 
 function normalizeLocalOutputKeys(value: unknown): AllmoneLocalOutputKeyConfigRecord[] {
@@ -438,7 +493,15 @@ function toConfigFile(
     }))
   }
 
+  if (config.providerIds.length > 0) {
+    fileConfig.providerIds = config.providerIds.map((record) => ({ ...record }))
+  }
+
   return fileConfig
+}
+
+function providerIdAssignmentKey(providerKind: string, entryIndex: number): string {
+  return `${providerKind}:${entryIndex}`
 }
 
 function toHomePath(path: string, runtimeHome: RuntimeHomePaths): string {

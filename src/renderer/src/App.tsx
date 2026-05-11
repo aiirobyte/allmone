@@ -259,6 +259,7 @@ export function App({
       await window.allmone.runtime.upsertApiKeyUpstream({
         providerKind: input.providerKind,
         entryIndex: input.entryIndex,
+        providerId: input.providerId,
         apiKey: input.apiKey,
         providerName: input.providerName,
         baseUrl: input.baseUrl,

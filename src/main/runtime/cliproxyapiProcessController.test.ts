@@ -61,6 +61,7 @@ function createHarness(options: {
       releasePageUrl: 'https://github.com/router-for-me/CLIProxyAPI/releases/latest',
       localExecutablePath: runtimeHome.cliProxyApiExecutablePath
     },
+    providerIds: [],
     localOutputKeys: [],
     runtime: {
       host: '127.0.0.1',
