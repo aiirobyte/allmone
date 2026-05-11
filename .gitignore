@@ -65,6 +65,7 @@ temp/
 
 # Local Codex skills and state
 .codex/
+.claude/
 
 # Local git worktrees
 .worktrees/
