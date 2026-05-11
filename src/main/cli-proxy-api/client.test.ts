@@ -143,6 +143,44 @@ test('normalizes successful read responses and keeps raw responses', async () =>
   )
 })
 
+test('reads provider-scoped model candidates through management routes', async () => {
+  const seenUrls: string[] = []
+  const fetch: CliProxyApiFetch = async (input) => {
+    const url = new URL(inputToUrl(input))
+    seenUrls.push(inputToUrl(input))
+
+    if (url.pathname.endsWith('/auth-files/models')) {
+      return jsonResponse({ models: [{ id: 'codex-mini-latest' }] })
+    }
+
+    return jsonResponse({
+      channel: 'gemini',
+      models: [{ name: 'gemini-2.5-pro' }]
+    })
+  }
+  const client = createCliProxyApiClient({
+    baseUrl: 'http://localhost:8317/v0/management',
+    fetch
+  })
+
+  assert.deepEqual(await client.getAuthFileModels('codex-work.json'), {
+    models: [{ id: 'codex-mini-latest' }],
+    raw: { models: [{ id: 'codex-mini-latest' }] }
+  })
+  assert.deepEqual(await client.getModelDefinitions(' Gemini '), {
+    channel: 'gemini',
+    models: [{ name: 'gemini-2.5-pro' }],
+    raw: {
+      channel: 'gemini',
+      models: [{ name: 'gemini-2.5-pro' }]
+    }
+  })
+  assert.deepEqual(seenUrls, [
+    'http://localhost:8317/v0/management/auth-files/models?name=codex-work.json',
+    'http://localhost:8317/v0/management/model-definitions/gemini'
+  ])
+})
+
 test('normalizes empty config responses', async () => {
   const client = createCliProxyApiClient({
     fetch: async () => jsonResponse({})

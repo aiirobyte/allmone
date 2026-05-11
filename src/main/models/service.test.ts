@@ -825,3 +825,429 @@ test('model inventory keeps configured providers visible when /models has no row
     )
   })
 })
+
+test('model inventory syncs API-key provider candidates into identity aliases', async () => {
+  await withTempHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({
+      homeDir,
+      platform: 'darwin'
+    })
+    const configStore = createAllmoneConfigStore({
+      runtimeHome,
+      safeStorage: createSafeStorage()
+    })
+    let writtenEntries: unknown[] | undefined
+    const upstreamService = {
+      ...createFakeUpstreamService(),
+      async getUpstreamSummaries() {
+        return [
+          {
+            providerKind: 'gemini-api-key',
+            label: 'Gemini API key',
+            configured: true,
+            redactedFields: ['apiKey'],
+            entries: [
+              {
+                'base-url': 'https://generativelanguage.googleapis.com/v1beta',
+                disabled: false,
+                models: [{ name: 'gemini-existing', alias: 'public-existing' }]
+              }
+            ]
+          }
+        ]
+      },
+      async getApiKeyUpstreamEntries(providerKind: string) {
+        assert.equal(providerKind, 'gemini-api-key')
+        return [
+          {
+            'api-key': 'gemini-secret',
+            'base-url': 'https://generativelanguage.googleapis.com/v1beta',
+            custom: true,
+            models: [{ name: 'gemini-existing', alias: 'public-existing' }]
+          }
+        ]
+      },
+      async writeApiKeyUpstreamEntries(providerKind: string, entries: unknown[]) {
+        assert.equal(providerKind, 'gemini-api-key')
+        writtenEntries = entries
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      },
+      async getProviderModelCandidates() {
+        return ['gemini-existing', 'gemini-new']
+      }
+    } as UpstreamService
+    const service = createModelsService({
+      configStore,
+      upstreamService,
+      modelsFetch: async () => {
+        throw new Error('API-key sync must not use merged /models')
+      },
+      generateId: () => 'lok_default',
+      generateKey: () => 'ak-allmone-default'
+    })
+
+    const inventory = await service.getModelInventory()
+
+    assert.deepEqual(writtenEntries, [
+      {
+        'api-key': 'gemini-secret',
+        'base-url': 'https://generativelanguage.googleapis.com/v1beta',
+        custom: true,
+        models: [
+          { name: 'gemini-existing', alias: 'public-existing' },
+          { name: 'gemini-new', alias: 'gemini-new' }
+        ]
+      }
+    ])
+    assert.deepEqual(
+      inventory.providers[0].models.map((model) => model.id),
+      ['public-existing', 'gemini-new']
+    )
+    assert(!JSON.stringify(inventory).includes('gemini-secret'))
+  })
+})
+
+test('model inventory prefers CLIProxyAPI OpenAI-compatible candidates when available', async () => {
+  await withTempHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({
+      homeDir,
+      platform: 'darwin'
+    })
+    const configStore = createAllmoneConfigStore({
+      runtimeHome,
+      safeStorage: createSafeStorage()
+    })
+    let writtenProvider: unknown
+    const upstreamService = {
+      ...createFakeOpenAiCompatibilityUpstreamService(),
+      async getOpenAiCompatibilityProviderConfigs() {
+        return [
+          {
+            name: 'MIMO',
+            'base-url': 'https://mimo.example.com/v1',
+            'api-key-entries': [{ 'api-key': 'mimo-secret' }],
+            models: [{ name: 'mimo-explicit', alias: 'mimo-public' }]
+          }
+        ]
+      },
+      async writeOpenAiCompatibilityProviderConfig(index: number, provider: unknown) {
+        assert.equal(index, 0)
+        writtenProvider = provider
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      },
+      async getProviderModelCandidates() {
+        return ['mimo-explicit', 'mimo-cli']
+      }
+    } as UpstreamService
+    const service = createModelsService({
+      configStore,
+      upstreamService,
+      openAiCompatibleModelsFetch: async () => {
+        throw new Error('OpenAI-compatible fallback must not run')
+      },
+      generateId: () => 'lok_default',
+      generateKey: () => 'ak-allmone-default'
+    })
+
+    const inventory = await service.getModelInventory()
+
+    assert.deepEqual(writtenProvider, {
+      name: 'MIMO',
+      'base-url': 'https://mimo.example.com/v1',
+      'api-key-entries': [{ 'api-key': 'mimo-secret' }],
+      models: [
+        { name: 'mimo-explicit', alias: 'mimo-public' },
+        { name: 'mimo-cli', alias: 'mimo-cli' }
+      ]
+    })
+    assert.deepEqual(
+      inventory.providers[0].models.map((model) => model.id),
+      ['mimo-public', 'mimo-cli']
+    )
+    assert(!JSON.stringify(inventory).includes('mimo-secret'))
+  })
+})
+
+test('model inventory falls back to OpenAI-compatible upstream /models and writes identities', async () => {
+  await withTempHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({
+      homeDir,
+      platform: 'darwin'
+    })
+    const configStore = createAllmoneConfigStore({
+      runtimeHome,
+      safeStorage: createSafeStorage()
+    })
+    const requests: Array<{
+      url: string
+      authorization: string | null
+      headerValue: string | null
+    }> = []
+    let writtenProvider: unknown
+    const upstreamService = {
+      ...createFakeOpenAiCompatibilityUpstreamService(),
+      async getUpstreamSummaries() {
+        return [
+          {
+            providerKind: 'openai-compatibility',
+            label: 'OpenAI-compatible provider',
+            configured: true,
+            redactedFields: ['apiKeyEntries', 'headers'],
+            entries: [
+              {
+                name: 'MIMO',
+                disabled: false,
+                baseUrl: 'https://mimo.example.com/v1',
+                apiKeyEntries: [{ 'api-key': '[REDACTED]' }],
+                headers: { 'X-Safe': 'visible' },
+                models: [{ name: 'mimo-explicit', alias: 'mimo-public' }]
+              }
+            ]
+          }
+        ]
+      },
+      async getOpenAiCompatibilityProviderConfigs() {
+        return [
+          {
+            name: 'MIMO',
+            disabled: false,
+            'base-url': 'https://mimo.example.com/v1',
+            'api-key-entries': [{ 'api-key': 'mimo-secret', 'proxy-url': '' }],
+            headers: { 'X-Safe': 'visible' },
+            custom: 'preserved',
+            models: [{ name: 'mimo-explicit', alias: 'mimo-public' }]
+          }
+        ]
+      },
+      async writeOpenAiCompatibilityProviderConfig(index: number, provider: unknown) {
+        assert.equal(index, 0)
+        writtenProvider = provider
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      },
+      async getProviderModelCandidates() {
+        return null
+      }
+    } as UpstreamService
+    const service = createModelsService({
+      configStore,
+      upstreamService,
+      openAiCompatibleModelsFetch: async (input, init) => {
+        const headers = new Headers(init?.headers)
+        requests.push({
+          url: input instanceof Request ? input.url : input.toString(),
+          authorization: headers.get('authorization'),
+          headerValue: headers.get('x-safe')
+        })
+        return new Response(
+          JSON.stringify({
+            object: 'list',
+            data: [{ id: 'mimo-explicit' }, { id: 'mimo-new' }]
+          }),
+          { status: 200 }
+        )
+      },
+      generateId: () => 'lok_default',
+      generateKey: () => 'ak-allmone-default'
+    })
+
+    const inventory = await service.getModelInventory()
+
+    assert.deepEqual(requests, [
+      {
+        url: 'https://mimo.example.com/v1/models',
+        authorization: 'Bearer mimo-secret',
+        headerValue: 'visible'
+      }
+    ])
+    assert.deepEqual(writtenProvider, {
+      name: 'MIMO',
+      disabled: false,
+      'base-url': 'https://mimo.example.com/v1',
+      'api-key-entries': [{ 'api-key': 'mimo-secret', 'proxy-url': '' }],
+      headers: { 'X-Safe': 'visible' },
+      custom: 'preserved',
+      models: [
+        { name: 'mimo-explicit', alias: 'mimo-public' },
+        { name: 'mimo-new', alias: 'mimo-new' }
+      ]
+    })
+    assert.deepEqual(
+      inventory.providers[0].models.map((model) => model.id),
+      ['mimo-public', 'mimo-new']
+    )
+    assert(!JSON.stringify(inventory).includes('mimo-secret'))
+  })
+})
+
+test('model inventory redacts OpenAI-compatible fallback failures in renderer payloads', async () => {
+  await withTempHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({
+      homeDir,
+      platform: 'darwin'
+    })
+    const configStore = createAllmoneConfigStore({
+      runtimeHome,
+      safeStorage: createSafeStorage()
+    })
+    const upstreamService = {
+      ...createFakeOpenAiCompatibilityUpstreamService(),
+      async getOpenAiCompatibilityProviderConfigs() {
+        return [
+          {
+            name: 'MIMO',
+            'base-url': 'https://mimo.example.com/v1',
+            'api-key-entries': [{ 'api-key': 'mimo-secret' }],
+            models: [{ name: 'mimo-explicit', alias: 'mimo-public' }]
+          }
+        ]
+      },
+      async writeOpenAiCompatibilityProviderConfig() {
+        throw new Error('write should not run')
+      },
+      async getProviderModelCandidates() {
+        return null
+      }
+    } as UpstreamService
+    const service = createModelsService({
+      configStore,
+      upstreamService,
+      openAiCompatibleModelsFetch: async () =>
+        new Response('upstream rejected mimo-secret', { status: 500 }),
+      generateId: () => 'lok_default',
+      generateKey: () => 'ak-allmone-default'
+    })
+
+    const inventory = await service.getModelInventory()
+
+    assert.equal(inventory.providers[0].modelState, 'sync_unavailable')
+    assert.match(inventory.providers[0].emptyMessage ?? '', /\[REDACTED\]/)
+    assert.deepEqual(
+      inventory.providers[0].models.map((model) => model.id),
+      ['mimo-public']
+    )
+    assert(!JSON.stringify(inventory).includes('mimo-secret'))
+  })
+})
+
+test('model inventory writes account OAuth identity aliases when candidates are available', async () => {
+  await withTempHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({
+      homeDir,
+      platform: 'darwin'
+    })
+    const configStore = createAllmoneConfigStore({
+      runtimeHome,
+      safeStorage: createSafeStorage()
+    })
+    let writtenAliases: unknown
+    const upstreamService = {
+      ...createFakeUpstreamService(),
+      async getOauthModelAliases() {
+        return {
+          codex: [{ name: 'codex-existing', alias: 'codex-public' }]
+        }
+      },
+      async writeOauthModelAliases(input: unknown) {
+        writtenAliases = input
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      },
+      async getProviderModelCandidates() {
+        return ['codex-existing', 'codex-new']
+      }
+    } as UpstreamService
+    const service = createModelsService({
+      configStore,
+      upstreamService,
+      modelsFetch: async () => {
+        throw new Error('Account sync should use CLIProxyAPI candidate data')
+      },
+      generateId: () => 'lok_default',
+      generateKey: () => 'ak-allmone-default'
+    })
+
+    const inventory = await service.getModelInventory()
+
+    assert.deepEqual(writtenAliases, {
+      codex: [
+        { name: 'codex-existing', alias: 'codex-public' },
+        { name: 'codex-new', alias: 'codex-new' }
+      ]
+    })
+    assert.deepEqual(
+      inventory.providers[1].models.map((model) => model.id),
+      ['codex-public', 'codex-new']
+    )
+  })
+})
+
+test('model inventory keeps MIMO fallback aliases separate from Codex account aliases', async () => {
+  await withTempHome(async (homeDir) => {
+    const runtimeHome = resolveRuntimeHome({
+      homeDir,
+      platform: 'darwin'
+    })
+    const configStore = createAllmoneConfigStore({
+      runtimeHome,
+      safeStorage: createSafeStorage()
+    })
+    const upstreamService = {
+      ...createFakeOpenAiCompatibilityAndCodexUpstreamService(),
+      async getOpenAiCompatibilityProviderConfigs() {
+        return [
+          {
+            name: 'MIMO',
+            'base-url': 'https://mimo.example.com/v1',
+            'api-key-entries': [{ 'api-key': 'mimo-secret' }],
+            models: []
+          }
+        ]
+      },
+      async writeOpenAiCompatibilityProviderConfig() {
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      },
+      async getOauthModelAliases() {
+        return {}
+      },
+      async writeOauthModelAliases() {
+        return { ok: true, status: 200, raw: { status: 'ok' } }
+      },
+      async getProviderModelCandidates(input: { providerKind: string }) {
+        return input.providerKind === 'codex'
+          ? ['codex-mini-latest']
+          : null
+      }
+    } as UpstreamService
+    const service = createModelsService({
+      configStore,
+      upstreamService,
+      modelsFetch: async () => {
+        throw new Error('Merged /models must not decide MIMO/Codex membership')
+      },
+      openAiCompatibleModelsFetch: async () =>
+        new Response(
+          JSON.stringify({ data: [{ id: 'mimo-only-model' }] }),
+          { status: 200 }
+        ),
+      generateId: () => 'lok_default',
+      generateKey: () => 'ak-allmone-default'
+    })
+
+    const inventory = await service.getModelInventory()
+    const mimo = inventory.providers.find(
+      (provider) => provider.providerKind === 'openai-compatibility'
+    )
+    const codex = inventory.providers.find(
+      (provider) => provider.providerKind === 'codex'
+    )
+
+    assert.deepEqual(
+      mimo?.models.map((model) => model.id),
+      ['mimo-only-model']
+    )
+    assert.deepEqual(
+      codex?.models.map((model) => model.id),
+      ['codex-mini-latest']
+    )
+    assert(!JSON.stringify(inventory).includes('mimo-secret'))
+  })
+})

@@ -180,3 +180,40 @@ test('renders local output key summaries when model inventory is unavailable', (
   assert.match(html, /Default local key/)
   assert.match(html, /ak-k\.\.\.\[REDACTED\]\.\.\.down/)
 })
+
+test('renders sync-unavailable provider rows without dropping configured models', () => {
+  const html = renderToStaticMarkup(
+    <ModelsPage
+      state={createState({
+        modelInventory: {
+          serviceOrigin: 'http://127.0.0.1:8317',
+          apiBaseUrl: 'http://127.0.0.1:8317/v1',
+          fetchedAt: '2026-05-10T00:00:00.000Z',
+          localOutputKeys: [],
+          providers: [
+            {
+              id: 'openai-compatibility:0',
+              providerKind: 'openai-compatibility',
+              label: 'MIMO',
+              family: 'api-key-upstream',
+              configured: true,
+              details: ['https://mimo.example.com/v1'],
+              modelState: 'sync_unavailable',
+              emptyMessage: 'Provider-scoped model discovery is unavailable',
+              models: [{ id: 'mimo-public', source: 'configured' }]
+            }
+          ]
+        }
+      })}
+      runtimeReachable={true}
+      onRefresh={() => {}}
+      onCreateGeneratedLocalOutputKey={() => {}}
+      onRenameLocalOutputKey={() => {}}
+      onRevealLocalOutputKey={() => {}}
+      onDeleteLocalOutputKey={() => {}}
+    />
+  )
+
+  assert.match(html, /Provider-scoped model discovery is unavailable/)
+  assert.match(html, /mimo-public/)
+})

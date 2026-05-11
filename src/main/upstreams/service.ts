@@ -9,14 +9,17 @@ import {
   type CliProxyApiApiKeyDeleteInput,
   type CliProxyApiApiKeyPatchInput,
   type CliProxyApiAuthFileDeleteInput,
+  type CliProxyApiAuthFileModelsResult,
   type CliProxyApiAuthFilesResult,
   type CliProxyApiKeysResult,
+  type CliProxyApiModelDefinitionsResult,
   type CliProxyApiOauthExcludedModelsMap,
   type CliProxyApiOauthModelAliasMap,
   type CliProxyApiOpenAiCompatibilityDeleteInput,
   type CliProxyApiOpenAiCompatibilityProvider,
   type CliProxyApiOpenAiCompatibilityProviderInput,
   type CliProxyApiOpenAiCompatibilityResult,
+  type CliProxyApiModelRecord,
   type CliProxyApiUpstreamApiKeyDeleteInput,
   type CliProxyApiUpstreamApiKeyEntry,
   type CliProxyApiUpstreamApiKeySectionResult,
@@ -35,6 +38,7 @@ import type {
   UpstreamAuthFileSummary,
   UpstreamProviderCatalogEntry,
   UpstreamProviderKind,
+  UpstreamProviderModelCandidateInput,
   UpstreamProviderSummary
 } from './types'
 
@@ -83,6 +87,9 @@ export interface UpstreamServiceClient {
   ): Promise<CliProxyApiWriteResult>
 
   getOpenAiCompatibilityProviders(): Promise<CliProxyApiOpenAiCompatibilityResult>
+  putOpenAiCompatibilityProviders?(
+    providers: CliProxyApiOpenAiCompatibilityProvider[]
+  ): Promise<CliProxyApiWriteResult>
   upsertOpenAiCompatibilityProvider(
     provider: CliProxyApiOpenAiCompatibilityProviderInput
   ): Promise<CliProxyApiWriteResult>
@@ -97,6 +104,8 @@ export interface UpstreamServiceClient {
   deleteAmpCodeConfig(): Promise<CliProxyApiWriteResult>
 
   getAuthFiles(): Promise<CliProxyApiAuthFilesResult>
+  getAuthFileModels?(name: string): Promise<CliProxyApiAuthFileModelsResult>
+  getModelDefinitions?(channel: string): Promise<CliProxyApiModelDefinitionsResult>
   deleteAuthFile(input: CliProxyApiAuthFileDeleteInput): Promise<CliProxyApiWriteResult>
 
   getOauthModelAlias(): Promise<{ aliases: CliProxyApiOauthModelAliasMap; raw: unknown }>
@@ -134,6 +143,23 @@ export interface UpstreamService {
     providerKind: UpstreamProviderKind,
     input: CliProxyApiUpstreamApiKeyDeleteInput
   ): Promise<CliProxyApiWriteResult>
+  getApiKeyUpstreamEntries?(
+    providerKind: UpstreamProviderKind
+  ): Promise<CliProxyApiUpstreamApiKeyEntry[]>
+  writeApiKeyUpstreamEntries?(
+    providerKind: UpstreamProviderKind,
+    entries: CliProxyApiUpstreamApiKeyEntry[]
+  ): Promise<CliProxyApiWriteResult>
+  getOpenAiCompatibilityProviderConfigs?(): Promise<
+    CliProxyApiOpenAiCompatibilityProvider[]
+  >
+  writeOpenAiCompatibilityProviderConfig?(
+    index: number,
+    provider: CliProxyApiOpenAiCompatibilityProvider
+  ): Promise<CliProxyApiWriteResult>
+  getProviderModelCandidates?(
+    input: UpstreamProviderModelCandidateInput
+  ): Promise<string[] | null>
   getAmpConfig(): Promise<UpstreamAmpConfig>
   writeAmpConfig(input: UpstreamAmpConfig): Promise<CliProxyApiWriteResult>
   resetAmpConfig(): Promise<CliProxyApiWriteResult>
@@ -352,6 +378,129 @@ class DefaultUpstreamService implements UpstreamService {
     })
   }
 
+  async getApiKeyUpstreamEntries(
+    providerKind: UpstreamProviderKind
+  ): Promise<CliProxyApiUpstreamApiKeyEntry[]> {
+    return withSanitizedErrors(async () => {
+      const kind = requireApiKeyProvider(providerKind)
+
+      if (kind === 'openai-compatibility') {
+        throw new Error('OpenAI-compatible providers are not API-key sections')
+      }
+
+      return (await this.getApiKeyEntries(kind)).entries
+    })
+  }
+
+  async writeApiKeyUpstreamEntries(
+    providerKind: UpstreamProviderKind,
+    entries: CliProxyApiUpstreamApiKeyEntry[]
+  ): Promise<CliProxyApiWriteResult> {
+    return withSanitizedErrors(async () => {
+      const kind = requireApiKeyProvider(providerKind)
+
+      if (kind === 'openai-compatibility') {
+        throw new Error('OpenAI-compatible providers are not API-key sections')
+      }
+
+      return this.putApiKeyEntries(kind, entries)
+    })
+  }
+
+  async getOpenAiCompatibilityProviderConfigs(): Promise<
+    CliProxyApiOpenAiCompatibilityProvider[]
+  > {
+    return withSanitizedErrors(async () =>
+      (await this.client.getOpenAiCompatibilityProviders()).providers
+    )
+  }
+
+  async writeOpenAiCompatibilityProviderConfig(
+    index: number,
+    provider: CliProxyApiOpenAiCompatibilityProvider
+  ): Promise<CliProxyApiWriteResult> {
+    return withSanitizedErrors(async () => {
+      const name = provider.name?.trim()
+      const baseUrl = provider['base-url']?.trim()
+
+      if (!name) {
+        throw new Error('Provider name is required')
+      }
+      if (!baseUrl) {
+        throw new Error('Base URL is required')
+      }
+
+      if (this.client.putOpenAiCompatibilityProviders) {
+        const current = await this.client.getOpenAiCompatibilityProviders()
+
+        if (index < 0 || index >= current.providers.length) {
+          throw new Error('OpenAI-compatible provider entry not found')
+        }
+
+        const next = [...current.providers]
+        next[index] = provider
+
+        return this.client.putOpenAiCompatibilityProviders(next)
+      }
+
+      return this.client.upsertOpenAiCompatibilityProvider(
+        provider as CliProxyApiOpenAiCompatibilityProviderInput
+      )
+    })
+  }
+
+  async getProviderModelCandidates(
+    input: UpstreamProviderModelCandidateInput
+  ): Promise<string[] | null> {
+    return withSanitizedErrors(async () => {
+      if (
+        input.providerFamily === 'account-upstream' ||
+        input.providerFamily === 'imported-account-upstream'
+      ) {
+        if (!this.client.getAuthFileModels) {
+          return null
+        }
+
+        const authFileName =
+          stringValue(input.entry.name) ??
+          stringValue(input.entry.id) ??
+          stringValue(input.entry.authIndex) ??
+          stringValue(input.entry.auth_index)
+
+        if (!authFileName) {
+          return null
+        }
+
+        return modelIdsFromRecords(
+          (await this.client.getAuthFileModels(authFileName)).models
+        )
+      }
+
+      if (input.providerFamily !== 'api-key-upstream') {
+        return null
+      }
+
+      if (input.providerKind === 'openai-compatibility') {
+        return null
+      }
+
+      if (!this.client.getModelDefinitions) {
+        return null
+      }
+
+      const channel =
+        input.channel?.trim() || modelDefinitionChannel(input.providerKind)
+
+      if (!channel) {
+        return null
+      }
+
+      return modelIdsFromRecords(
+        (await this.client.getModelDefinitions(channel)).models
+      )
+    })
+  }
+
   async getAmpConfig(): Promise<UpstreamAmpConfig> {
     return withSanitizedErrors(async () => toUpstreamAmpConfig(
       (await this.client.getAmpCodeConfig()).config
@@ -500,6 +649,50 @@ function requireApiKeyProvider(
   }
 
   throw new Error(`${providerKind} does not support API-key upstream writes`)
+}
+
+function modelDefinitionChannel(
+  providerKind: UpstreamProviderKind
+): string | undefined {
+  switch (providerKind) {
+    case 'gemini-api-key':
+      return 'gemini'
+    case 'codex-api-key':
+      return 'codex'
+    case 'claude-api-key':
+      return 'claude'
+    case 'vertex-api-key':
+      return 'vertex'
+    default:
+      return undefined
+  }
+}
+
+function modelIdsFromRecords(records: CliProxyApiModelRecord[]): string[] {
+  const ids: string[] = []
+  const seen = new Set<string>()
+
+  for (const record of records) {
+    const id =
+      stringValue(record.id) ??
+      stringValue(record.name) ??
+      stringValue(record.model)
+
+    if (!id) {
+      continue
+    }
+
+    const key = id.toLowerCase()
+
+    if (seen.has(key)) {
+      continue
+    }
+
+    seen.add(key)
+    ids.push(id)
+  }
+
+  return ids
 }
 
 function summarizeApiKeySection(

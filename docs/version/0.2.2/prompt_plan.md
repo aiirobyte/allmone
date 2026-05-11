@@ -1,7 +1,7 @@
 # allmone v0.2.2 Prompt Plan
 
 Last updated: 2026-05-11
-Status: Planned
+Status: Complete
 
 ## Version Target
 
@@ -11,7 +11,7 @@ Implement Provider-scoped model alias sync so every configured Provider displays
 
 ### Prompt 0: Effective Model Alias Contract
 
-Status: Pending
+Status: Complete
 
 Goal: Define and test the upstream/effective model ID contract before changing refresh behavior.
 
@@ -33,7 +33,7 @@ Guardrails:
 
 ### Prompt 1: Provider Alias Sync Service
 
-Status: Pending
+Status: Complete
 
 Goal: Add the main-process sync that discovers Provider upstream models, writes missing identity aliases into Provider config, and preserves explicit aliases.
 
@@ -60,7 +60,7 @@ Guardrails:
 
 ### Prompt 2: Models Refresh Uses Effective Alias Lists
 
-Status: Pending
+Status: Complete
 
 Goal: Make the `Models` refresh button sync aliases first, then show the final exposed model IDs per Provider.
 
@@ -83,7 +83,7 @@ Guardrails:
 
 ### Prompt 3: Regression, Docs, And Version Handoff
 
-Status: Pending
+Status: Complete
 
 Goal: Close v0.2.2 with regression coverage, full verification, and updated planning state.
 
@@ -105,12 +105,12 @@ Guardrails:
 
 ## Completion Checklist
 
-- [ ] Effective model alias contract.
-- [ ] Provider upstream model discovery and alias sync service.
-- [ ] OpenAI-compatible upstream `/models` fallback.
-- [ ] `Models` refresh uses final exposed model lists.
-- [ ] MIMO/Codex and secret-boundary regressions.
-- [ ] Root docs updated for v0.2.2 completion and v0.3.0 handoff.
-- [ ] `bun run test`.
-- [ ] `bun run typecheck`.
-- [ ] `bun run build`.
+- [x] Effective model alias contract.
+- [x] Provider upstream model discovery and alias sync service.
+- [x] OpenAI-compatible upstream `/models` fallback.
+- [x] `Models` refresh uses final exposed model lists.
+- [x] MIMO/Codex and secret-boundary regressions.
+- [x] Root docs updated for v0.2.2 completion and v0.3.0 handoff.
+- [x] `bun run test`.
+- [x] `bun run typecheck`.
+- [x] `bun run build`.

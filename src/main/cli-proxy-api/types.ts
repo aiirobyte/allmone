@@ -263,6 +263,36 @@ export interface CliProxyApiOpenAiCompatibilityResult {
   raw: CliProxyApiOpenAiCompatibilityResponse
 }
 
+export interface CliProxyApiModelRecord extends CliProxyApiJsonObject {
+  id?: string
+  name?: string
+  model?: string
+  display_name?: string
+  type?: string
+  owned_by?: string
+}
+
+export interface CliProxyApiAuthFileModelsResponse extends CliProxyApiJsonObject {
+  models?: CliProxyApiModelRecord[]
+}
+
+export interface CliProxyApiAuthFileModelsResult {
+  models: CliProxyApiModelRecord[]
+  raw: CliProxyApiAuthFileModelsResponse
+}
+
+export interface CliProxyApiModelDefinitionsResponse
+  extends CliProxyApiJsonObject {
+  channel?: string
+  models?: CliProxyApiModelRecord[]
+}
+
+export interface CliProxyApiModelDefinitionsResult {
+  channel: string
+  models: CliProxyApiModelRecord[]
+  raw: CliProxyApiModelDefinitionsResponse
+}
+
 export interface CliProxyApiAmpCodeApiKeyMapping extends CliProxyApiJsonObject {
   'upstream-api-key'?: string
   'api-keys'?: string[]

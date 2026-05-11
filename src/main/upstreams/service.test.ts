@@ -135,6 +135,55 @@ test('returns a complete secret-safe catalog snapshot', () => {
   }
 })
 
+test('reads provider model candidates from CLIProxyAPI-owned routes', async () => {
+  const seen: string[] = []
+  const service = createUpstreamService({
+    client: createFakeClient({
+      async getModelDefinitions(channel) {
+        seen.push(`definition:${channel}`)
+        return {
+          channel,
+          models: [
+            { id: 'gemini-2.5-pro' },
+            { name: 'gemini-2.5-flash' },
+            { model: 'gemini-2.5-pro' }
+          ],
+          raw: { channel, models: [] }
+        }
+      },
+      async getAuthFileModels(name) {
+        seen.push(`auth-file:${name}`)
+        return {
+          models: [
+            { id: 'codex-mini-latest' },
+            { name: 'codex-mini-latest' },
+            { model: 'codex-max-latest' }
+          ],
+          raw: { models: [] }
+        }
+      }
+    })
+  })
+
+  const apiKeyModels = await service.getProviderModelCandidates?.({
+    providerKind: 'gemini-api-key',
+    providerFamily: 'api-key-upstream',
+    entryIndex: 0,
+    entry: {},
+    channel: undefined
+  })
+  const accountModels = await service.getProviderModelCandidates?.({
+    providerKind: 'codex',
+    providerFamily: 'account-upstream',
+    entryIndex: 0,
+    entry: { name: 'codex-work.json' }
+  })
+
+  assert.deepEqual(apiKeyModels, ['gemini-2.5-pro', 'gemini-2.5-flash'])
+  assert.deepEqual(accountModels, ['codex-mini-latest', 'codex-max-latest'])
+  assert.deepEqual(seen, ['definition:gemini', 'auth-file:codex-work.json'])
+})
+
 test('summarizes every upstream family without leaking secrets', async () => {
   const client = createFakeClient({
     async getApiKeys() {

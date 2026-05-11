@@ -28,6 +28,10 @@ import {
   type CliProxyApiLatestVersionResponse,
   type CliProxyApiLatestVersionResult,
   type CliProxyApiManagementCheckResult,
+  type CliProxyApiAuthFileModelsResponse,
+  type CliProxyApiAuthFileModelsResult,
+  type CliProxyApiModelDefinitionsResponse,
+  type CliProxyApiModelDefinitionsResult,
   type CliProxyApiOauthExcludedModelsMap,
   type CliProxyApiOauthExcludedModelsPatchInput,
   type CliProxyApiOauthExcludedModelsResponse,
@@ -192,6 +196,35 @@ export class CliProxyApiClient {
 
     return {
       files: Array.isArray(raw.files) ? raw.files : [],
+      raw
+    }
+  }
+
+  async getAuthFileModels(name: string): Promise<CliProxyApiAuthFileModelsResult> {
+    const raw = await this.getJsonValue<CliProxyApiAuthFileModelsResponse>(
+      'auth-files/models',
+      {
+        query: { name }
+      }
+    )
+
+    return {
+      models: Array.isArray(raw.models) ? raw.models : [],
+      raw
+    }
+  }
+
+  async getModelDefinitions(
+    channel: string
+  ): Promise<CliProxyApiModelDefinitionsResult> {
+    const normalized = channel.trim().toLowerCase()
+    const raw = await this.getJsonValue<CliProxyApiModelDefinitionsResponse>(
+      `model-definitions/${encodeURIComponent(normalized)}`
+    )
+
+    return {
+      channel: typeof raw.channel === 'string' ? raw.channel : normalized,
+      models: Array.isArray(raw.models) ? raw.models : [],
       raw
     }
   }
@@ -452,6 +485,18 @@ export class CliProxyApiClient {
         : [],
       raw
     }
+  }
+
+  async putOpenAiCompatibilityProviders(
+    providers: CliProxyApiOpenAiCompatibilityResponse['openai-compatibility']
+  ): Promise<CliProxyApiWriteResult> {
+    const response = await this.writeJson<CliProxyApiWriteStatusResponse>(
+      'PUT',
+      'openai-compatibility',
+      { body: providers ?? [] }
+    )
+
+    return toWriteResult(response)
   }
 
   private async getApiKeySection(

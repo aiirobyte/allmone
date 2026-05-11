@@ -10,14 +10,14 @@ Read CLAUDE.md and docs/todo.md, then continue with the active version's next un
 
 ## Active Version
 
-Active version: `0.2.2` planned
+Active version: `0.3.0` planning
 
-- Previous version: `docs/version/0.2.1/`
-- Active version docs: `docs/version/0.2.2/`
+- Previous version: `docs/version/0.2.2/`
+- Active version docs: create `docs/version/0.3.0/` during planning setup.
 
 ## Current Target
 
-Target: v0.2.2 Provider model alias sync.
+Target: v0.3.0 Model Resource Inventory planning.
 
 Definition of done:
 
@@ -89,23 +89,23 @@ Definition of done:
 - [x] Create `docs/version/0.2.2/spec.md`.
 - [x] Create `docs/version/0.2.2/prompt_plan.md`.
 - [x] Create `docs/version/0.2.2/todo.md`.
-- [ ] Define the effective model ID contract for Provider alias rows.
-- [ ] Add Provider alias sync that writes missing identity aliases.
-- [ ] Add OpenAI-compatible upstream `/models` fallback when CLIProxyAPI cannot provide Provider-scoped discovery.
-- [ ] Preserve explicit aliases and `fork: true` final model ID behavior.
-- [ ] Make `Models` refresh sync aliases before displaying Provider model lists.
-- [ ] Add MIMO/Codex regressions proving each Provider shows its own final alias list.
-- [ ] Run `bun run test`.
-- [ ] Run `bun run typecheck`.
-- [ ] Run `bun run build`.
+- [x] Define the effective model ID contract for Provider alias rows.
+- [x] Add Provider alias sync that writes missing identity aliases.
+- [x] Add OpenAI-compatible upstream `/models` fallback when CLIProxyAPI cannot provide Provider-scoped discovery.
+- [x] Preserve explicit aliases and `fork: true` final model ID behavior.
+- [x] Make `Models` refresh sync aliases before displaying Provider model lists.
+- [x] Add MIMO/Codex regressions proving each Provider shows its own final alias list.
+- [x] Run `bun run test`.
+- [x] Run `bun run typecheck`.
+- [x] Run `bun run build`.
 
 ## Next Prompt
 
-Start v0.2.2 Prompt 0.
+Start v0.3.0 planning setup.
 
 Expected next change:
 
-- Add tests and types for the effective Provider model alias contract before changing refresh behavior.
+- Create `docs/version/0.3.0/` planning files for deeper model resource inventory.
 
 ## Version Roadmap
 
@@ -118,7 +118,7 @@ Expected next change:
 - [x] v0.1.6 React Renderer And Sidebar Navigation: migrate renderer to React, add Providers/Settings sidebar, and remove duplicate OpenAI-compatible provider surface.
 - [x] v0.2.0 Auth Management Surface: multiple persisted auth files and providers through CLIProxyAPI.
 - [x] v0.2.1 Models Module And Named Output Keys: model-first provider/model list plus persistent named local output keys.
-- [ ] v0.2.2 Provider Model Alias Sync: seed missing identity aliases per Provider and display final exposed model IDs.
+- [x] v0.2.2 Provider Model Alias Sync: seed missing identity aliases per Provider and display final exposed model IDs.
 - [ ] v0.3.0 Model Resource Inventory: deeper model resource inventory with backing provider/auth details.
 - [ ] v0.4.0 Usage And Logs: request log, usage, queue, and error visibility.
 - [ ] v0.5.0 Local Network Sharing: safe localhost/public-interface controls through CLIProxyAPI.
@@ -166,4 +166,5 @@ Expected next change:
 - 2026-05-11: Corrected Models refresh after local verification showed CLIProxyAPI v6.10.9 returns the same merged models response for `/api/provider/{provider}/.../models`, even for unknown providers. Account rows still read CLIProxyAPI model output, while API-key/OpenAI-compatible rows now read only their configured `models` entries from CLIProxyAPI-backed provider config, so MIMO no longer inherits Codex's merged model list.
 - 2026-05-11: User clarified the desired model behavior: each Provider's upstream models should be represented in that Provider's CLIProxyAPI alias config. Missing aliases should become identity aliases, explicit aliases should remain authoritative, and `Models` should display final exposed model IDs under the Provider row. Created `docs/version/0.2.2/` planning files and deferred broader v0.3.0 inventory work.
 - 2026-05-11: Updated v0.2.2 planning so CLIProxyAPI remains the preferred Provider-scoped discovery source, but OpenAI-compatible Providers use a main-process upstream `/models` fallback when CLIProxyAPI cannot provide reliable Provider-scoped model discovery.
+- 2026-05-11: v0.2.2 completed. Added effective alias projection, Provider alias sync, OpenAI-compatible fallback discovery, account/OAuth alias sync, sync-unavailable renderer state, and MIMO/Codex plus secret-boundary regressions. Next work returns to v0.3.0 planning.
 - Update this file and the active version todo after every meaningful coding session.

@@ -133,6 +133,15 @@ export interface UpstreamProviderSummary {
   diagnostics?: string[]
 }
 
+export interface UpstreamProviderModelCandidateInput {
+  providerKind: UpstreamProviderKind
+  providerFamily: UpstreamProviderFamily
+  entryIndex: number
+  entry: Record<string, unknown>
+  providerName?: string
+  channel?: string
+}
+
 export interface UpstreamProxyUrlValue {
   value: string
   redacted: boolean

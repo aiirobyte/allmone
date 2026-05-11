@@ -10,10 +10,10 @@ Project-level planning references:
 
 ## Active Version
 
-Active version: `0.2.2` planned
+Active version: `0.3.0` planning
 
-- Previous version: `docs/version/0.2.1/`
-- Active version docs: `docs/version/0.2.2/`
+- Previous version: `docs/version/0.2.2/`
+- Active version docs: create `docs/version/0.3.0/` during planning setup.
 
 ## Product Intent
 
@@ -36,7 +36,7 @@ If a feature would require allmone to parse provider protocols, route API traffi
 - `0.1.6`: React renderer and sidebar navigation. Complete.
 - `0.2.0`: Auth management surface for multiple persisted auth files and providers. Complete.
 - `0.2.1`: Models module and named persistent local output keys. Complete.
-- `0.2.2`: Provider model alias sync. Planned.
+- `0.2.2`: Provider model alias sync. Complete.
 - `0.3.0`: Deeper model resource inventory. Planned.
 - `0.4.0`: Usage and logs. Planned.
 - `0.5.0`: Local network sharing. Planned.

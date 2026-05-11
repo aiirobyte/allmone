@@ -86,13 +86,16 @@ export function ModelsPage({
                 </div>
               ) : null}
               <div className="model-chip-list">
+                {provider.modelState === 'sync_unavailable' ? (
+                  <span>{provider.emptyMessage ?? 'Model sync unavailable'}</span>
+                ) : null}
                 {provider.models.length > 0 ? (
                   provider.models.map((model) => (
                     <code key={model.id}>{model.id}</code>
                   ))
-                ) : (
+                ) : provider.modelState !== 'sync_unavailable' ? (
                   <span>{provider.emptyMessage ?? 'No models reported'}</span>
-                )}
+                ) : null}
               </div>
             </article>
           ))

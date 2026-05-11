@@ -43,7 +43,7 @@ export interface ModelInventoryProviderRow {
   disabled?: boolean
   details: string[]
   models: ModelInventoryModelRow[]
-  modelState: 'ready' | 'empty'
+  modelState: 'ready' | 'empty' | 'sync_unavailable'
   emptyMessage?: string
 }
 

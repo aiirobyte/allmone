@@ -1,0 +1,117 @@
+import type { ModelInventoryModelRow } from './types'
+
+export interface ProviderModelAliasRow {
+  name?: string
+  alias?: string
+  fork?: boolean
+  [key: string]: unknown
+}
+
+export interface ReconcileModelAliasesInput {
+  existingAliases: ProviderModelAliasRow[]
+  upstreamModelIds: string[]
+}
+
+export interface ReconcileModelAliasesResult {
+  aliases: ProviderModelAliasRow[]
+  changed: boolean
+}
+
+export function projectEffectiveModelRows(
+  value: unknown
+): ModelInventoryModelRow[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const rows: ModelInventoryModelRow[] = []
+  const seen = new Set<string>()
+
+  for (const item of value) {
+    if (!isRecord(item)) {
+      continue
+    }
+
+    const name = getString(item.name)
+    const alias = getString(item.alias)
+
+    if (alias) {
+      pushConfiguredRow(rows, seen, alias)
+    }
+
+    if (name && (!alias || item.fork === true)) {
+      pushConfiguredRow(rows, seen, name)
+    }
+  }
+
+  return rows
+}
+
+export function reconcileModelAliases(
+  input: ReconcileModelAliasesInput
+): ReconcileModelAliasesResult {
+  const aliases = input.existingAliases.map((row) => ({ ...row }))
+  const byName = new Set(
+    aliases
+      .map((row) => normalizeModelId(row.name))
+      .filter((name): name is string => Boolean(name))
+  )
+  let changed = false
+
+  for (let index = 0; index < aliases.length; index += 1) {
+    const row = aliases[index]
+    const name = normalizeModelId(row.name)
+
+    if (name && normalizeModelId(row.alias) === undefined) {
+      aliases[index] = { ...row, alias: name }
+      changed = true
+    }
+  }
+
+  for (const modelId of input.upstreamModelIds) {
+    const name = normalizeModelId(modelId)
+
+    if (!name || byName.has(name)) {
+      continue
+    }
+
+    byName.add(name)
+    aliases.push({ name, alias: name })
+    changed = true
+  }
+
+  return {
+    aliases,
+    changed
+  }
+}
+
+function pushConfiguredRow(
+  rows: ModelInventoryModelRow[],
+  seen: Set<string>,
+  id: string
+): void {
+  const key = id.toLowerCase()
+
+  if (seen.has(key)) {
+    return
+  }
+
+  seen.add(key)
+  rows.push({
+    id,
+    source: 'configured'
+  })
+}
+
+function normalizeModelId(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function getString(value: unknown): string | undefined {
+  return normalizeModelId(value)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
